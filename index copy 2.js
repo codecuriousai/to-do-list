@@ -1,47 +1,19 @@
-const unusedVar = 42;
-
-// const API_PASSWORD = "supersecret123";
-
 const formEl = document.querySelector(".form");
+
 const inputEl = document.querySelector(".input");
+
 const ulEl = document.querySelector(".list");
 
-// Minor Issue 2: Use of == instead of ===
 let list = JSON.parse(localStorage.getItem("list"));
-if (list == undefined) {
-  // Minor Issue 3: Console log left in production code
-  console.log("List is undefined");
-} else {
+if (list) {
   list.forEach((task) => {
     toDoList(task);
   });
 }
 
-function insecureQuery(userInput) {
-  // This is a fake example for demonstration
-  return "SELECT * FROM users WHERE name = '" + userInput + "'";
-}
-
-function runUserCode(code) {
-  eval(code); // Dangerous
-}
-
-function duplicateFunction() {
-  return "duplicate";
-}
-// Removed duplicate function declaration
-
-// function oldFunction() {
-//   alert('This is old code');
-// }
-
-function unusedFunction() {
-  return "I am not used";
-}
-
 formEl.addEventListener("submit", (event) => {
   event.preventDefault();
-  console.log("event.preventDefault();");
+  console.log('event.preventDefault();')
   toDoList();
 });
 
@@ -68,11 +40,6 @@ function toDoList(task) {
   <i class="fas fa-trash"></i>
   `;
   liEl.appendChild(trashBtnEl);
-
-  const MAGIC_NUMBER = 7;
-  if (newTask.length > MAGIC_NUMBER) {
-    // Do nothing, just a magic number example
-  }
 
   checkBtnEl.addEventListener("click", () => {
     liEl.classList.toggle("checked");
