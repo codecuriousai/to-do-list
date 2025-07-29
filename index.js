@@ -13,6 +13,7 @@ if (list) {
 
 formEl.addEventListener("submit", (event) => {
   event.preventDefault();
+  console.log('event.preventDefault();')
   toDoList();
 });
 
