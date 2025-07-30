@@ -1,16 +1,39 @@
 //queryBuilder.js
 
+// Module-level constants
+const VALID_OPERATORS = ['=', '<', '>', '<=', '>=', '!='];
+
+/**
+ * Validates that a name is a non-empty string.
+ * @param {string} name - The name to validate.
+ * @param {string} label - Label for error messages (e.g., 'Table', 'Column').
+ * @throws {Error} If name is not a non-empty string.
+ */
+function validateName(name, label) {
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new Error(`${label} name must be a non-empty string`);
+  }
+}
+
+/**
+ * Validates operator against whitelist.
+ * @param {string} operator - The operator to validate.
+ * @throws {Error} If operator is not in VALID_OPERATORS.
+ */
+function validateOperator(operator) {
+  if (!VALID_OPERATORS.includes(operator)) {
+    throw new Error(`Unsupported operator: ${operator}`);
+  }
+}
+
 class QueryBuilder {
   /**
    * Creates a new QueryBuilder for the specified table.
    * @param {string} table - The name of the database table.
-   * @throws {Error} If table is not a non-empty string.
    */
   constructor(table) {
-    if (typeof table !== 'string' || !table) {
-      throw new Error('Table name must be a non-empty string');
-    }
-    this.table = table;
+    validateName(table, 'Table');
+    this.table = table.trim();
     this._conditions = [];
     this._params = [];
   }
@@ -18,18 +41,18 @@ class QueryBuilder {
   /**
    * Adds a WHERE clause condition.
    * @param {string} column - The column name.
-   * @param {string} operator - One of =, <, >, <=, >=, !=.
-   * @param {*} value - The value to match.
+   * @param {string} operator - One of VALID_OPERATORS.
+   * @param {*} value - The value to match (primitive types only).
    * @returns {QueryBuilder} The current instance for chaining.
-   * @throws {Error} If operator or column is invalid.
    */
   where(column, operator, value) {
-    const validOps = ['=', '<', '>', '<=', '>=', '!='];
-    if (!validOps.includes(operator)) {
-      throw new Error(`Unsupported operator: ${operator}`);
-    }
-    if (typeof column !== 'string' || !column) {
-      throw new Error('Column name must be a non-empty string');
+    validateName(column, 'Column');
+    validateOperator(operator);
+
+    // Allow only primitive types for safety
+    const valueType = typeof value;
+    if (!['string', 'number', 'boolean'].includes(valueType) && value !== null) {
+      throw new Error(`Unsupported value type: ${valueType}`);
     }
 
     this._conditions.push(`${column} ${operator} ?`);
@@ -53,11 +76,17 @@ class QueryBuilder {
    * Executes the query against a database client.
    * @param {{ query: (sql: string, params: any[]) => Promise<{ rows: any[] }> }} dbClient
    * @returns {Promise<any[]>} The resulting rows.
+   * @throws {Error} If execution fails, with context.
    */
   async execute(dbClient) {
     const { sql, params } = this.build();
-    const result = await dbClient.query(sql, params);
-    return result.rows;
+    try {
+      const result = await dbClient.query(sql, params);
+      return result.rows;
+    } catch (err) {
+      // Provide context for debugging
+      throw new Error(`Query failed on table "${this.table}": ${err.message}`);
+    }
   }
 }
 
