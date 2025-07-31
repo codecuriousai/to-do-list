@@ -1,6 +1,5 @@
 const unusedVar = 42;
 
-// const API_PASSWORD = "supersecret123";
 
 const formEl = document.querySelector(".form");
 const inputEl = document.querySelector(".input");
