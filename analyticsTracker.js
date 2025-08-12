@@ -21,8 +21,7 @@ function AnalyticsTracker() {
 
       var data = JSON.stringify({ elementId: elementId, timestamp: timestamp });
       xhr.send(data);
-
-      console.log("Tracked click on: " + elementId); // OTHER ISSUE: Sensitive data in logs
+      
     }.bind(this));
   };
 
@@ -64,3 +63,4 @@ function initTracking() {
 }
 
 initTracking();
+
