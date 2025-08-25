@@ -47,7 +47,7 @@ jobs:
               }
             },
             "session_id": "%s",
-            "body": "Analyze and suggest fixes for Pull Request #%d from repository %s."
+            "body": "Hi"
           }' \
           "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id" "$pr_number" "$repo_url")
 
