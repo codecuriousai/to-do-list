@@ -21,15 +21,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.LANGFLOW_API_KEY }}
         run: |
           repo_url="https://github.com/${{ github.repository }}"
-          branch_name="PR-Comments-Post"
+          branch_name="${{ github.event.pull_request.head.ref }}"
           github_token="${GITHUB_TOKEN}"
-          per_page=10
-          max_pages=5
           pr_number=${{ github.event.pull_request.number }}
           session_id="user_$(date +%s)"
+          per_page=10
+          max_pages=5
 
-          echo "Calling Langflow for PR #$pr_number on branch $branch_name"
-
+          # Construct payload
           payload=$(printf '{
             "tweaks": {
               "GitHubBranchPRsFetcher-Cdz4k": {
@@ -42,13 +41,10 @@ jobs:
               }
             },
             "session_id": "%s",
-            "body": "Hi"
-          }' \
-          "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id")
+            "body": "Analyze and review PR #%d on branch %s from %s"
+          }' "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id")
 
-          echo "Calling Langflow with payload:"
-          echo "$payload"
-
+          echo "Calling Langflow..."
           response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $API_KEY" \
@@ -57,92 +53,51 @@ jobs:
           echo "Langflow raw response:"
           echo "$response"
 
-          echo "response_json=$response" >> $GITHUB_OUTPUT
+          # Encode for safety
+          response_b64=$(echo "$response" | base64)
+          echo "response_b64=$response_b64" >> $GITHUB_OUTPUT
 
       - name: Create PR Analysis Check Run with buttons
         uses: actions/github-script@v6
         with:
+          github-token: ${{ secrets.LANGFLOW_API_KEY }}
           script: |
-            const raw = `${{ steps.langflow_call.outputs.response_json }}`;
+            const b64 = `${{ steps.langflow_call.outputs.response_b64 }}`;
+            const decoded = Buffer.from(b64, 'base64').toString('utf-8');
 
-            // Verbose logging for easier diagnostics
-            core.info(`Langflow raw response: ${raw}`);
-
-            let messageText = '';
+            let parsed;
             try {
-              const responseObj = JSON.parse(raw);
-              core.info(`Langflow outputs: ${JSON.stringify(responseObj.outputs)}`);
-              messageText =
-                responseObj?.outputs?.?.outputs?.[11]?.results?.message?.text || '';
-              core.info(`Langflow messageText: ${messageText}`);
-            } catch (err) {
-              core.setFailed(`❌ Failed to parse Langflow response JSON: ${err.message}`);
+              parsed = JSON.parse(decoded);
+            } catch (e) {
+              core.setFailed("❌ Failed to parse Langflow response JSON.");
               return;
             }
 
-            // CLEAN THE MESSAGE BEFORE PARSING
-            function cleanForJSON(text) {
-              let cleaned = text.trim()
-                .replace(/```
-                .replace(/```\s*/gi, '')
-                .replace(/{{/g, '{')              // Replace double curly brackets
-                .replace(/}}/g, '}')
-                .replace(/“|”/g, '"')             // Replace curly quotes
-                .replace(/‘|’/g, "'");
+            // Extract review assessment
+            const assessment = parsed?.comparison_analysis?.review_assessment?.toLowerCase() || '';
 
-              // Strip leading content not part of a JSON object/array
-              const fitStart = Math.min(
-                cleaned.indexOf('{') === -1 ? Infinity : cleaned.indexOf('{'),
-                cleaned.indexOf('[') === -1 ? Infinity : cleaned.indexOf('[')
-              );
-              if (fitStart !== Infinity) {
-                cleaned = cleaned.substring(fitStart);
-              }
-              return cleaned;
-            }
+            const properlyReviewed = assessment === 'properly_reviewed';
 
-            // Robust JSON extraction with cleaning and regex
-            function extractAndParseJSON(text) {
-              const cleaned = cleanForJSON(text);
-              core.info('Attempting extraction from cleaned:');
-              core.info(cleaned);
+            const checkName = 'PR Analysis';
+            const actions = properlyReviewed
+              ? [{ label: 'Merge PR', identifier: 'merge_pr' }]
+              : [{ label: 'Post Comments', identifier: 'post_comments' }];
 
-              // Try parsing directly
-              try {
-                return JSON.parse(cleaned);
-              } catch (e) {
-                core.info('Direct parse failed, trying regex extraction...');
-              }
+            const summary = properlyReviewed
+              ? '✅ Langflow: PR is properly reviewed. You can merge it.'
+              : '📝 Langflow: PR needs comments. Please review.';
 
-              // Try extracting a JSON array
-              const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
-              if (arrayMatch) {
-                try {
-                  return JSON.parse(arrayMatch);
-                } catch (e) {}
-              }
-
-              // Try extracting a JSON object
-              const objectMatch = cleaned.match(/\{[\s\S]*\}/);
-              if (objectMatch) {
-                try {
-                  return JSON.parse(objectMatch);
-                } catch (e) {}
-              }
-
-              core.error('Unable to extract valid JSON from messageText');
-              throw new Error('Unable to extract valid JSON from messageText');
-            }
-
-            let parsedResult = {};
-            try {
-              parsedResult = extractAndParseJSON(messageText);
-              core.info(`Langflow parsed result: ${JSON.stringify(parsedResult)}`);
-            } catch (err) {
-              core.setFailed(`❌ Failed to extract JSON from Langflow message text: ${err.message}`);
-              return;
-            }
-
-            // Use parsedResult for PR comments/checks...
-            // Example: core.info for logging, or post comments as needed.
-
+            await github.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: checkName,
+              head_sha: context.payload.pull_request.head.sha,
+              status: 'completed',
+              conclusion: 'neutral',
+              output: {
+                title: checkName,
+                summary: summary,
+                text: JSON.stringify(parsed, null, 2)
+              },
+              actions: actions,
+            });
