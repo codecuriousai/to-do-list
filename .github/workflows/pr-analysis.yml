@@ -65,6 +65,14 @@ jobs:
           LANGFLOW_RESPONSE_JSON: ${{ steps.langflow_call.outputs.response_json }}
         with:
           script: |
+            // Function to strip markdown JSON code fences
+            function stripMarkdownFences(text) {
+              return text
+                .replace(/``````json
+                .replace(/``````
+                .trim();
+            }
+
             const raw = process.env.LANGFLOW_RESPONSE_JSON;
             core.info(`Raw Langflow response: ${raw}`);
 
@@ -76,34 +84,24 @@ jobs:
               return;
             }
 
-            // Extract the nested message text containing your detailed PR analysis JSON
-            const msgText = responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text;
-
-            if (!msgText) {
+            const msgTextRaw = responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text;
+            if (!msgTextRaw) {
               core.setFailed('❌ No message text found in Langflow response outputs.');
               return;
             }
 
-            // Parse the message text as JSON
+            const msgText = stripMarkdownFences(msgTextRaw);
+
             let analysis;
             try {
               analysis = JSON.parse(msgText);
             } catch (err) {
-              core.setFailed(`❌ Failed to parse analysis JSON from message text: ${err.message}`);
+              core.setFailed(`❌ Failed to parse cleaned analysis JSON: ${err.message}`);
               return;
             }
 
-            // Log the structured analysis JSON for visibility
             core.info(`Parsed PR Analysis JSON: ${JSON.stringify(analysis, null, 2)}`);
 
-            // Optionally, set as step output for use in other jobs or steps
             core.setOutput("pr_analysis_json", JSON.stringify(analysis));
 
-            // Here, you can add logic to post comments or create PR checks based on analysis
-            // For example:
-            // await github.issues.createComment({
-            //   owner: context.repo.owner,
-            //   repo: context.repo.repo,
-            //   issue_number: context.issue.number,
-            //   body: `PR Analysis Summary:\n\`\`\`json\n${JSON.stringify(analysis, null, 2)}\n\`\`\``
-            // });
+            // You can extend this to post PR comments or create check runs as needed here
