@@ -57,7 +57,7 @@ jobs:
           echo "Langflow response:"
           echo "$response"
 
-          echo "response_json=$response" >> $GITHUB_OUTPUT
+          echo "response_json=$(echo "$response" | jq -r '.outputs[0].outputs[1].results.message.text' 2>/dev/null || echo "needs_comments")" >> $GITHUB_OUTPUT
 
       - name: Create PR Analysis Check Run with buttons
         uses: actions/github-script@v6
