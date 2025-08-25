@@ -7,8 +7,6 @@ on:
 jobs:
   analyze-pr:
     runs-on: ubuntu-latest
-
-    env:
       
 
     steps:
