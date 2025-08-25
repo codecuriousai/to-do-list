@@ -65,7 +65,6 @@ jobs:
           LANGFLOW_RESPONSE_JSON: ${{ steps.langflow_call.outputs.response_json }}
         with:
           script: |
-            const core = require('@actions/core');
             const github = require('@actions/github');
             
             function extractAndParseJSON(text) {
