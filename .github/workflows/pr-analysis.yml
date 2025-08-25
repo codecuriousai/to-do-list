@@ -18,7 +18,7 @@ jobs:
           API_KEY: "AstraCS:doJijFJwFioApBaswsaRBigy:5863ee7b2f203becbd015d24db02193c98d6aaccd317b4c247c70b12ffa88bc4"
           API_ENDPOINT: "https://api.langflow.astra.datastax.com/lf/720b3827-93a5-40a1-9c93-0a974680f48c/api/v1/run"
           FLOW_ID: "43913ec5-a0de-44b8-b31b-44019176489d"
-          GITHUB_TOKEN: ${{secrets.LANGFLOW_API_KEY}}
+          GITHUB_TOKEN: ${{ secrets.LANGFLOW_API_KEY }}
         run: |
           repo_url="https://github.com/${{ github.repository }}"
           branch_name="PR-Comments-Post"
@@ -27,14 +27,9 @@ jobs:
           max_pages=5
           pr_number=${{ github.event.pull_request.number }}
           session_id="user_$(date +%s)"
-          
-          echo "pr_number:"
-          echo "$pr_number"
-          
-          echo "branch_name:"
-          echo "$branch_name"
-          
-          # Construct JSON payload using printf
+
+          echo "Calling Langflow for PR #$pr_number on branch $branch_name"
+
           payload=$(printf '{
             "tweaks": {
               "GitHubBranchPRsFetcher-Cdz4k": {
@@ -59,38 +54,56 @@ jobs:
             -H "Authorization: Bearer $API_KEY" \
             -d "$payload")
 
-          echo "Langflow response: $response"
+          echo "Langflow response:"
+          echo "$response"
 
-          # Extract result message safely using jq (fallback to 'needs_comments')
-          result=$(echo "$response" | jq -r '.outputs[0].outputs[1].results.message.text' 2>/dev/null || echo "needs_comments")
-
-          echo "result=$result" >> $GITHUB_OUTPUT
+          echo "response_json=$response" >> $GITHUB_OUTPUT
 
       - name: Create PR Analysis Check Run with buttons
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const resultText = process.env['result']?.toLowerCase() || '';
-            const properlyReviewed = resultText.includes('properly_reviewed') || resultText.includes('ready to merge');
+            const raw = `${{ steps.langflow_call.outputs.response_json }}`;
 
-            const checkName = 'PR Analysis';
-            const actions = properlyReviewed
-              ? [{ label: 'Merge PR', identifier: 'merge_pr' }]
-              : [{ label: 'Post Comments', identifier: 'post_comments' }];
+            function extractAndParseJSON(text) {
+              const strategies = [
+                (t) => t.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim(),
+                (t) => {
+                  const start = Math.min(
+                    t.indexOf('{') === -1 ? Infinity : t.indexOf('{'),
+                    t.indexOf('[') === -1 ? Infinity : t.indexOf('[')
+                  );
+                  const end = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
+                  return start !== Infinity && end !== -1
+                    ? t.substring(start, end + 1)
+                    : t;
+                },
+                (t) => {
+                  const arrayMatch = t.match(/\[[\s\S]*\]/);
+                  return arrayMatch ? arrayMatch[0] : t;
+                },
+                (t) => {
+                  const objectMatch = t.match(/\{[\s\S]*\}/);
+                  return objectMatch ? objectMatch[0] : t;
+                }
+              ];
 
-            # await github.checks.create({
-            #   owner: context.repo.owner,
-            #   repo: context.repo.repo,
-            #   name: checkName,
-            #   head_sha: context.payload.pull_request.head.sha,
-            #   status: 'completed',
-            #   conclusion: 'neutral',
-            #   output: {
-            #     title: checkName,
-            #     summary: properlyReviewed
-            #       ? 'Langflow: PR is properly reviewed. You can merge it.'
-            #       : 'Langflow: PR needs comments. Please review and comment.'
-            #   },
-            #   actions: actions,
-            # });
+              for (const strategy of strategies) {
+                try {
+                  const cleaned = strategy(text);
+                  const parsed = JSON.parse(cleaned);
+                  return parsed;
+                } catch (e) {
+                  continue;
+                }
+              }
+
+              throw new Error('Unable to extract valid JSON from response');
+            }
+
+            const parsedResponse = extractAndParseJSON(raw);
+            const resultText = JSON.stringify(parsedResponse).toLowerCase();
+            echo "$parsedResponse"
+            echo "$resultText"
+            
