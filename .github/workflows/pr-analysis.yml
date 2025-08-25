@@ -72,6 +72,8 @@ jobs:
               const responseObj = JSON.parse(raw);
               messageText =
                 responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text || '';
+                echo "Langflow messageText:"
+                echo "$messageText"  
             } catch (err) {
               core.setFailed('❌ Failed to parse Langflow response JSON.');
               return;
@@ -123,28 +125,6 @@ jobs:
       
             const resultText = JSON.stringify(parsedResult).toLowerCase();
       
-            const properlyReviewed =
-              resultText.includes('properly_reviewed') ||
-              resultText.includes('ready to merge');
-      
-            const checkName = 'PR Analysis';
-            const actions = properlyReviewed
-              ? [{ label: 'Merge PR', identifier: 'merge_pr' }]
-              : [{ label: 'Post Comments', identifier: 'post_comments' }];
-      
-            await github.checks.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: checkName,
-              head_sha: context.payload.pull_request.head.sha,
-              status: 'completed',
-              conclusion: 'neutral',
-              output: {
-                title: checkName,
-                summary: properlyReviewed
-                  ? 'Langflow: PR is properly reviewed. You can merge it.'
-                  : 'Langflow: PR needs comments. Please review and comment.'
-              },
-              actions: actions,
-            });
+            echo "Langflow resultText:"
+            echo "$resultText"  
             
