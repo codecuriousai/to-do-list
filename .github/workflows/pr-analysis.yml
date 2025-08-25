@@ -17,7 +17,7 @@ jobs:
         env:
           API_KEY: "AstraCS:doJijFJwFioApBaswsaRBigy:5863ee7b2f203becbd015d24db02193c98d6aaccd317b4c247c70b12ffa88bc4"
           API_ENDPOINT: "https://api.langflow.astra.datastax.com/lf/720b3827-93a5-40a1-9c93-0a974680f48c/api/v1/run"
-          FLOW_ID: "ca1962e2-2272-406a-a925-2625b7c52812"
+          FLOW_ID: "43913ec5-a0de-44b8-b31b-44019176489d"
           GITHUB_TOKEN: "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"
         run: |
           repo_url="https://github.com/${{ github.repository }}"
