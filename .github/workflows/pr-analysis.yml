@@ -5,14 +5,76 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  create-check:
+  analyze-pr:
     runs-on: ubuntu-latest
+
+    env:
+      API_KEY: ${{ secrets.LANGFLOW_API_KEY }}
+      API_ENDPOINT: ${{ secrets.LANGFLOW_API_ENDPOINT }}
+      FLOW_ID: ${{ secrets.LANGFLOW_FLOW_ID }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Call Langflow API
+        id: langflow_call
+        run: |
+          repo_url="https://github.com/${{ github.repository }}"
+          branch_name="${{ github.event.pull_request.head.ref }}"
+          github_token="${GITHUB_TOKEN}"
+          per_page=10
+          max_pages=5
+          pr_number=${{ github.event.pull_request.number }}
+
+          # Construct JSON payload
+          read -r -d '' payload << EOM
+          {
+            "tweaks": {
+              "GitHubOpenPRsFetcher-t0YCZ": {
+                "repo_url": "$repo_url",
+                "branch_name": "$branch_name",
+                "github_token": "$github_token",
+                "per_page": $per_page,
+                "max_pages": $max_pages,
+                "pr_number": $pr_number
+              }
+            },
+            "session_id": "user_$(date +%s)",
+            "body": "Analyze and suggest fixes for Pull Request #$pr_number from repository $repo_url. Please provide detailed fix suggestions, code improvements, and resolution recommendations."
+          }
+EOM
+
+          echo "Payload to Langflow:"
+          echo "$payload"
+
+          response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $API_KEY" \
+            -d "$payload")
+
+          echo "Langflow response: $response"
+
+          # Extract the main text message (adjust path if your response differs)
+          result=$(echo "$response" | jq -r '.outputs[0].outputs[0].results.message.text' || echo "needs_comments")
+
+          echo "result=$result" >> $GITHUB_OUTPUT
+
       - name: Create PR Analysis Check Run with buttons
         uses: actions/github-script@v6
         with:
           script: |
+            const resultText = `${{ steps.langflow_call.outputs.result }}`.toLowerCase();
+
+            // Simple heuristic for demo - adjust this logic to parse Langflow's actual response better
+            const properlyReviewed = resultText.includes('properly_reviewed') || resultText.includes('merge');
+
             const checkName = 'PR Analysis';
+            const actions = properlyReviewed
+              ? [{ label: 'Merge PR', identifier: 'merge_pr' }]
+              : [{ label: 'Post Comments', identifier: 'post_comments' }];
+
             await github.checks.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -22,10 +84,9 @@ jobs:
               conclusion: 'neutral',
               output: {
                 title: checkName,
-                summary: 'Click buttons below to take action on this PR.',
+                summary: properlyReviewed
+                  ? 'Langflow: PR is properly reviewed. You can merge it.'
+                  : 'Langflow: PR needs comments. Please review and comment.'
               },
-              actions: [
-                { label: 'Merge PR', identifier: 'merge_pr' },
-                { label: 'Post Comments', identifier: 'post_comments' }
-              ],
+              actions: actions,
             });
