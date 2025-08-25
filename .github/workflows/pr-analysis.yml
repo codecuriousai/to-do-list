@@ -128,6 +128,37 @@ jobs:
             let analysis;
             try {
               analysis = extractAndParseJSON(msgText);
+              const assessment = (analysis?.comparison_analysis?.review_assessment || '').toLowerCase();
+              const properlyReviewed = assessment === 'properly_reviewed';
+              
+              if (properlyReviewed) {
+                await github.checks.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: "PR Review Status",
+                  head_sha: context.payload.pull_request.head.sha,
+                  status: "completed",
+                  conclusion: "success",
+                  output: {
+                    title: "Ready to Merge",
+                    summary: "This pull request is properly reviewed and ready to merge."
+                  }
+                });
+              } else {
+                await github.checks.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: "PR Review Status",
+                  head_sha: context.payload.pull_request.head.sha,
+                  status: "completed",
+                  conclusion: "neutral",
+                  output: {
+                    title: "Action Required",
+                    summary: "This pull request requires additional comments or reviews before merge."
+                  }
+                });
+              }
+
             } catch (err) {
               core.setFailed(`❌ Failed to extract or parse JSON from message text: ${err.message}`);
               return;
