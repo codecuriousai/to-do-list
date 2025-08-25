@@ -49,7 +49,6 @@ jobs:
           echo "Calling Langflow..."
           response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
             -H "Content-Type: application/json" \
-            # -H "x-api-key: $API_KEY" \
             -H "Authorization: Bearer AstraCS:doJijFJwFioApBaswsaRBigy:5863ee7b2f203becbd015d24db02193c98d6aaccd317b4c247c70b12ffa88bc4" \
             -d "$payload")
 
