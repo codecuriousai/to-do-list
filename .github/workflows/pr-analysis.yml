@@ -27,9 +27,10 @@ jobs:
           per_page=10
           max_pages=5
           pr_number=${{ github.event.pull_request.number }}
+          session_id="user_$(date +%s)"
 
-          # Construct JSON payload
-          read -r -d '' payload << EOM
+          # Construct JSON payload using heredoc
+          payload=$(cat <<EOF
           {
             "tweaks": {
               "GitHubOpenPRsFetcher-t0YCZ": {
@@ -41,24 +42,23 @@ jobs:
                 "pr_number": $pr_number
               }
             },
-            "session_id": "user_$(date +%s)",
+            "session_id": "$session_id",
             "body": "Analyze and suggest fixes for Pull Request #$pr_number from repository $repo_url. Please provide detailed fix suggestions, code improvements, and resolution recommendations."
           }
-EOM
+EOF
+          )
 
-          echo "Payload to Langflow:"
-          echo "$payload"
-
+          echo "Calling Langflow API..."
           response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
             -H "Content-Type: application/json" \
             -H "x-api-key: $API_KEY" \
             -d "$payload")
 
-          echo "Langflow response: $response"
+          echo "Langflow response:"
+          echo "$response"
 
-          # Extract the main text message (adjust path if your response differs)
+          # Extract result text or fallback
           result=$(echo "$response" | jq -r '.outputs[0].outputs[0].results.message.text' || echo "needs_comments")
-
           echo "result=$result" >> $GITHUB_OUTPUT
 
       - name: Create PR Analysis Check Run with buttons
@@ -67,8 +67,7 @@ EOM
           script: |
             const resultText = `${{ steps.langflow_call.outputs.result }}`.toLowerCase();
 
-            // Simple heuristic for demo - adjust this logic to parse Langflow's actual response better
-            const properlyReviewed = resultText.includes('properly_reviewed') || resultText.includes('merge');
+            const properlyReviewed = resultText.includes('properly_reviewed') || resultText.includes('ready to merge');
 
             const checkName = 'PR Analysis';
             const actions = properlyReviewed
