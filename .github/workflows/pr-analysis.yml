@@ -21,14 +21,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.LANGFLOW_API_KEY }}
         run: |
           repo_url="https://github.com/${{ github.repository }}"
-          branch_name="${{ github.event.pull_request.head.ref }}"
+          branch_name="PR-Comments-Post"
           github_token="${GITHUB_TOKEN}"
-          pr_number=${{ github.event.pull_request.number }}
-          session_id="user_$(date +%s)"
           per_page=10
           max_pages=5
+          pr_number=${{ github.event.pull_request.number }}
+          session_id="user_$(date +%s)"
 
-          # Construct payload
+          echo "Calling Langflow for PR #$pr_number on branch $branch_name"
+
           payload=$(printf '{
             "tweaks": {
               "GitHubBranchPRsFetcher-Cdz4k": {
@@ -41,10 +42,13 @@ jobs:
               }
             },
             "session_id": "%s",
-            "body": "Analyze and review PR #%d on branch %s from %s"
-          }' "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id")
+            "body": "Hi"
+          }' \
+          "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id")
 
-          echo "Calling Langflow..."
+          echo "Calling Langflow with payload:"
+          echo "$payload"
+
           response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $API_KEY" \
@@ -53,51 +57,53 @@ jobs:
           echo "Langflow raw response:"
           echo "$response"
 
-          # Encode for safety
-          response_b64=$(echo "$response" | base64)
-          echo "response_b64=$response_b64" >> $GITHUB_OUTPUT
+          echo "response_json=$response" >> $GITHUB_OUTPUT
 
-      - name: Create PR Analysis Check Run with buttons
+      - name: Process Langflow PR Analysis JSON
         uses: actions/github-script@v6
+        env:
+          LANGFLOW_RESPONSE_JSON: ${{ steps.langflow_call.outputs.response_json }}
         with:
-          github-token: ${{ secrets.LANGFLOW_API_KEY }}
           script: |
-            const b64 = `${{ steps.langflow_call.outputs.response_b64 }}`;
-            const decoded = Buffer.from(b64, 'base64').toString('utf-8');
+            const raw = process.env.LANGFLOW_RESPONSE_JSON;
+            core.info(`Raw Langflow response: ${raw}`);
 
-            let parsed;
+            let responseObj;
             try {
-              parsed = JSON.parse(decoded);
-            } catch (e) {
-              core.setFailed("❌ Failed to parse Langflow response JSON.");
+              responseObj = JSON.parse(raw);
+            } catch (err) {
+              core.setFailed(`❌ Failed to parse Langflow response JSON: ${err.message}`);
               return;
             }
 
-            // Extract review assessment
-            const assessment = parsed?.comparison_analysis?.review_assessment?.toLowerCase() || '';
+            // Extract the nested message text containing your detailed PR analysis JSON
+            const msgText = responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text;
 
-            const properlyReviewed = assessment === 'properly_reviewed';
+            if (!msgText) {
+              core.setFailed('❌ No message text found in Langflow response outputs.');
+              return;
+            }
 
-            const checkName = 'PR Analysis';
-            const actions = properlyReviewed
-              ? [{ label: 'Merge PR', identifier: 'merge_pr' }]
-              : [{ label: 'Post Comments', identifier: 'post_comments' }];
+            // Parse the message text as JSON
+            let analysis;
+            try {
+              analysis = JSON.parse(msgText);
+            } catch (err) {
+              core.setFailed(`❌ Failed to parse analysis JSON from message text: ${err.message}`);
+              return;
+            }
 
-            const summary = properlyReviewed
-              ? '✅ Langflow: PR is properly reviewed. You can merge it.'
-              : '📝 Langflow: PR needs comments. Please review.';
+            // Log the structured analysis JSON for visibility
+            core.info(`Parsed PR Analysis JSON: ${JSON.stringify(analysis, null, 2)}`);
 
-            await github.checks.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: checkName,
-              head_sha: context.payload.pull_request.head.sha,
-              status: 'completed',
-              conclusion: 'neutral',
-              output: {
-                title: checkName,
-                summary: summary,
-                text: JSON.stringify(parsed, null, 2)
-              },
-              actions: actions,
-            });
+            // Optionally, set as step output for use in other jobs or steps
+            core.setOutput("pr_analysis_json", JSON.stringify(analysis));
+
+            // Here, you can add logic to post comments or create PR checks based on analysis
+            // For example:
+            // await github.issues.createComment({
+            //   owner: context.repo.owner,
+            //   repo: context.repo.repo,
+            //   issue_number: context.issue.number,
+            //   body: `PR Analysis Summary:\n\`\`\`json\n${JSON.stringify(analysis, null, 2)}\n\`\`\``
+            // });
