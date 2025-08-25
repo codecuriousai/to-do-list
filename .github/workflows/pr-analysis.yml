@@ -65,12 +65,47 @@ jobs:
           LANGFLOW_RESPONSE_JSON: ${{ steps.langflow_call.outputs.response_json }}
         with:
           script: |
-            // Function to strip markdown JSON code fences
-            function stripMarkdownFences(text) {
-              return text
-                .replace(/``````json
-                .replace(/``````
-                .trim();
+            function extractAndParseJSON(text) {
+              const strategies = [
+                (t) =>
+                  t
+                    .replace(/```
+                    .replace(/```\s*/gi, '')
+                    .trim(),
+
+                (t) => {
+                  const start = Math.min(
+                    t.indexOf('{') === -1 ? Infinity : t.indexOf('{'),
+                    t.indexOf('[') === -1 ? Infinity : t.indexOf('[')
+                  );
+                  const end = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
+                  return start !== Infinity && end !== -1
+                    ? t.substring(start, end + 1)
+                    : t;
+                },
+
+                (t) => {
+                  const arrayMatch = t.match(/\[[\s\S]*\]/);
+                  return arrayMatch ? arrayMatch[0] : t;
+                },
+
+                (t) => {
+                  const objectMatch = t.match(/\{[\s\S]*\}/);
+                  return objectMatch ? objectMatch[0] : t;
+                }
+              ];
+
+              for (const strategy of strategies) {
+                try {
+                  const cleaned = strategy(text);
+                  const parsed = JSON.parse(cleaned);
+                  return parsed;
+                } catch (e) {
+                  continue;
+                }
+              }
+
+              throw new Error('Unable to extract valid JSON from response');
             }
 
             const raw = process.env.LANGFLOW_RESPONSE_JSON;
@@ -84,19 +119,17 @@ jobs:
               return;
             }
 
-            const msgTextRaw = responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text;
-            if (!msgTextRaw) {
+            const msgText = responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text;
+            if (!msgText) {
               core.setFailed('❌ No message text found in Langflow response outputs.');
               return;
             }
 
-            const msgText = stripMarkdownFences(msgTextRaw);
-
             let analysis;
             try {
-              analysis = JSON.parse(msgText);
+              analysis = extractAndParseJSON(msgText);
             } catch (err) {
-              core.setFailed(`❌ Failed to parse cleaned analysis JSON: ${err.message}`);
+              core.setFailed(`❌ Failed to extract or parse JSON from message text: ${err.message}`);
               return;
             }
 
@@ -104,4 +137,4 @@ jobs:
 
             core.setOutput("pr_analysis_json", JSON.stringify(analysis));
 
-            // You can extend this to post PR comments or create check runs as needed here
+            // Add your PR comment or checks logic here if desired
