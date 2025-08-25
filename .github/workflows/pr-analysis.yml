@@ -29,36 +29,34 @@ jobs:
           pr_number=${{ github.event.pull_request.number }}
           session_id="user_$(date +%s)"
 
-          # Construct JSON payload using heredoc
-          payload=$(cat <<EOF
-          {
+          # Construct JSON payload using printf to avoid EOF/heredoc issues
+          payload=$(printf '{
             "tweaks": {
               "GitHubOpenPRsFetcher-t0YCZ": {
-                "repo_url": "$repo_url",
-                "branch_name": "$branch_name",
-                "github_token": "$github_token",
-                "per_page": $per_page,
-                "max_pages": $max_pages,
-                "pr_number": $pr_number
+                "repo_url": "%s",
+                "branch_name": "%s",
+                "github_token": "%s",
+                "per_page": %s,
+                "max_pages": %s,
+                "pr_number": %s
               }
             },
-            "session_id": "$session_id",
-            "body": "Analyze and suggest fixes for Pull Request #$pr_number from repository $repo_url. Please provide detailed fix suggestions, code improvements, and resolution recommendations."
-          }
-EOF
-          )
+            "session_id": "%s",
+            "body": "Analyze and suggest fixes for Pull Request #%s from repository %s. Please provide detailed fix suggestions, code improvements, and resolution recommendations."
+          }' \
+          "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id" "$pr_number" "$repo_url")
 
-          echo "Calling Langflow API..."
+          echo "Calling Langflow..."
           response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
             -H "Content-Type: application/json" \
             -H "x-api-key: $API_KEY" \
             -d "$payload")
 
-          echo "Langflow response:"
-          echo "$response"
+          echo "Langflow response: $response"
 
-          # Extract result text or fallback
+          # Extract response safely
           result=$(echo "$response" | jq -r '.outputs[0].outputs[0].results.message.text' || echo "needs_comments")
+
           echo "result=$result" >> $GITHUB_OUTPUT
 
       - name: Create PR Analysis Check Run with buttons
