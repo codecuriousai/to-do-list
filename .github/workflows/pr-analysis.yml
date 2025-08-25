@@ -7,7 +7,6 @@ on:
 jobs:
   analyze-pr:
     runs-on: ubuntu-latest
-      
 
     steps:
       - name: Checkout code
@@ -16,11 +15,11 @@ jobs:
       - name: Call Langflow API
         id: langflow_call
         env:
-          API_KEY: "sk-XZ3b65F8nqZgx00XnLEIyLy4uG40IimyZxth7zMJ7Z4"
+          API_KEY: "AstraCS:doJijFJwFioApBaswsaRBigy:5863ee7b2f203becbd015d24db02193c98d6aaccd317b4c247c70b12ffa88bc4"
           API_ENDPOINT: "https://api.langflow.astra.datastax.com/lf/720b3827-93a5-40a1-9c93-0a974680f48c/api/v1/run"
           FLOW_ID: "ca1962e2-2272-406a-a925-2625b7c52812"
           GITHUB_TOKEN: "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"
-        run: |          
+        run: |
           repo_url="https://github.com/${{ github.repository }}"
           branch_name="${{ github.event.pull_request.head.ref }}"
           github_token="${GITHUB_TOKEN}"
@@ -29,42 +28,44 @@ jobs:
           pr_number=${{ github.event.pull_request.number }}
           session_id="user_$(date +%s)"
 
-          # Construct JSON payload using printf to avoid EOF/heredoc issues
+          # Construct JSON payload using printf
           payload=$(printf '{
             "tweaks": {
               "GitHubBranchPRsFetcher-Cdz4k": {
                 "repo_url": "%s",
                 "branch_name": "%s",
                 "github_token": "%s",
-                "per_page": %s,
-                "max_pages": %s,
-                "pr_number": %s
+                "per_page": %d,
+                "max_pages": %d,
+                "pr_number": %d
               }
             },
             "session_id": "%s",
-            "body": "Hi"
+            "body": "Analyze and suggest fixes for Pull Request #%d from repository %s."
           }' \
           "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id" "$pr_number" "$repo_url")
 
-          echo "Calling Langflow..."
+          echo "Calling Langflow with payload:"
+          echo "$payload"
+
           response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer AstraCS:doJijFJwFioApBaswsaRBigy:5863ee7b2f203becbd015d24db02193c98d6aaccd317b4c247c70b12ffa88bc4" \
+            -H "Authorization: Bearer $API_KEY" \
             -d "$payload")
 
           echo "Langflow response: $response"
 
-          # Extract response safely
-          result=$(echo "$response" | jq -r '.outputs[0].outputs[1].results.message.text' || echo "needs_comments")
+          # Extract result message safely using jq (fallback to 'needs_comments')
+          result=$(echo "$response" | jq -r '.outputs[0].outputs[1].results.message.text' 2>/dev/null || echo "needs_comments")
 
           echo "result=$result" >> $GITHUB_OUTPUT
 
       - name: Create PR Analysis Check Run with buttons
         uses: actions/github-script@v6
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const resultText = `${{ steps.langflow_call.outputs.result }}`.toLowerCase();
-
+            const resultText = process.env['result']?.toLowerCase() || '';
             const properlyReviewed = resultText.includes('properly_reviewed') || resultText.includes('ready to merge');
 
             const checkName = 'PR Analysis';
