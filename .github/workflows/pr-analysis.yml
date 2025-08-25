@@ -54,7 +54,7 @@ jobs:
             -H "Authorization: Bearer $API_KEY" \
             -d "$payload")
 
-          echo "Langflow response:"
+          echo "Langflow raw response:"
           echo "$response"
 
           echo "response_json=$response" >> $GITHUB_OUTPUT
@@ -64,66 +64,71 @@ jobs:
         with:
           script: |
             const raw = `${{ steps.langflow_call.outputs.response_json }}`;
-      
             let messageText = '';
-      
+
+            // Log raw for easier debugging
+            core.info(`Langflow raw: ${raw}`);
+
             try {
               const responseObj = JSON.parse(raw);
+              // Log outputs to check nesting
+              core.info(`Langflow outputs: ${JSON.stringify(responseObj.outputs)}`);
               messageText =
-                responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text || '';
-                echo "Langflow messageText:"
-                echo "$messageText"  
+                responseObj?.outputs?.?.outputs?.?.results?.message?.text || '';
+              core.info(`Langflow messageText: ${messageText}`);
             } catch (err) {
-              core.setFailed('❌ Failed to parse Langflow response JSON.');
+              core.setFailed(`❌ Failed to parse Langflow response JSON: ${err.message}`);
               return;
             }
-      
+
+            // Robust extraction
             function extractAndParseJSON(text) {
-              const strategies = [
-                (t) => t.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim(),
-                (t) => {
-                  const start = Math.min(
-                    t.indexOf('{') === -1 ? Infinity : t.indexOf('{'),
-                    t.indexOf('[') === -1 ? Infinity : t.indexOf('[')
-                  );
-                  const end = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
-                  return start !== Infinity && end !== -1
-                    ? t.substring(start, end + 1)
-                    : t;
-                },
-                (t) => {
-                  const arrayMatch = t.match(/\[[\s\S]*\]/);
-                  return arrayMatch ? arrayMatch[0] : t;
-                },
-                (t) => {
-                  const objectMatch = t.match(/\{[\s\S]*\}/);
-                  return objectMatch ? objectMatch[0] : t;
+              // Strategy 1: Remove markdown
+              try {
+                const cleaned = text.replace(/``````\s*/gi, '').trim();
+                return JSON.parse(cleaned);
+              } catch (e) {}
+
+              // Strategy 2: Extract array
+              try {
+                const arrayMatch = text.match(/\[[\s\S]*\]/);
+                if (arrayMatch) {
+                  return JSON.parse(arrayMatch);
                 }
-              ];
-      
-              for (const strategy of strategies) {
-                try {
-                  const cleaned = strategy(text);
-                  const parsed = JSON.parse(cleaned);
-                  return parsed;
-                } catch (e) {
-                  continue;
+              } catch (e) {}
+
+              // Strategy 3: Extract object
+              try {
+                const objectMatch = text.match(/\{[\s\S]*\}/);
+                if (objectMatch) {
+                  return JSON.parse(objectMatch);
                 }
-              }
-      
-              throw new Error('Unable to extract valid JSON from message text');
+              } catch (e) {}
+
+              // Strategy 4: Find first JSON after text
+              try {
+                const start = Math.min(
+                  text.indexOf('{') === -1 ? Infinity : text.indexOf('{'),
+                  text.indexOf('[') === -1 ? Infinity : text.indexOf('[')
+                );
+                const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
+                if (start !== Infinity && end !== -1) {
+                  const candidate = text.substring(start, end + 1).trim();
+                  return JSON.parse(candidate);
+                }
+              } catch (e) {}
+
+              throw new Error('Unable to extract valid JSON from messageText');
             }
-      
+
             let parsedResult = {};
             try {
               parsedResult = extractAndParseJSON(messageText);
+              core.info(`Langflow parsed result: ${JSON.stringify(parsedResult)}`);
             } catch (err) {
-              core.setFailed('❌ Failed to extract JSON from Langflow message text.');
+              core.setFailed(`❌ Failed to extract JSON from Langflow message text: ${err.message}`);
               return;
             }
-      
-            const resultText = JSON.stringify(parsedResult).toLowerCase();
-      
-            echo "Langflow resultText:"
-            echo "$resultText"  
-            
+
+            // Whatever you want to do with the parsedResult next...
+            // For example, displaying it in a PR comment
