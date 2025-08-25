@@ -62,7 +62,7 @@ jobs:
           echo "Langflow response: $response"
 
           # Extract result message safely using jq (fallback to 'needs_comments')
-          result=$(echo "$response" | jq -r '.outputs[0].outputs[1].results.message.text' 2>/dev/null || echo "needs_comments")
+          result=$(echo "$response" | jq -r 'data.outputs[0].outputs[1].results.message.text' 2>/dev/null || echo "needs_comments")
 
           echo "result=$result" >> $GITHUB_OUTPUT
 
