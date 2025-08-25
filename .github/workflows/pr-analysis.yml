@@ -62,7 +62,6 @@ jobs:
       - name: Create PR Analysis Check Run with buttons
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.LANGFLOW_API_KEY }}
           script: |
             const raw = `${{ steps.langflow_call.outputs.response_json }}`;
       
