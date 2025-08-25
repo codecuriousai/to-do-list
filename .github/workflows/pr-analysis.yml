@@ -131,8 +131,8 @@ jobs:
               analysis = extractAndParseJSON(msgText);
               const assessment = (analysis?.comparison_analysis?.review_assessment || '').toLowerCase();
               const properlyReviewed = assessment === 'properly_reviewed';
-               core.info(`Raw Langflow response: ${assessment}`);
-                core.info(`Raw Langflow response: ${properlyReviewed}`);
+               core.info(`Raw assessment: ${assessment}`);
+                core.info(`Raw properlyReviewed: ${properlyReviewed}`);
 
             } catch (err) {
               core.setFailed(`❌ Failed to extract or parse JSON from message text: ${err.message}`);
