@@ -9,10 +9,10 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      API_KEY: ${{ secrets.LANGFLOW_API_KEY }}
-      API_ENDPOINT: ${{ secrets.LANGFLOW_API_ENDPOINT }}
-      FLOW_ID: ${{ secrets.LANGFLOW_FLOW_ID }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      API_KEY: "sk-XZ3b65F8nqZgx00XnLEIyLy4uG40IimyZxth7zMJ7Z4"
+      API_ENDPOINT: "http://localhost:7860/api/v1/run"
+      FLOW_ID: "57b18f1e-0327-4901-9fab-a167422f893e"
+      GITHUB_TOKEN: "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"
 
     steps:
       - name: Checkout code
@@ -32,7 +32,7 @@ jobs:
           # Construct JSON payload using printf to avoid EOF/heredoc issues
           payload=$(printf '{
             "tweaks": {
-              "GitHubOpenPRsFetcher-t0YCZ": {
+              "GitHubBranchPRsFetcher-FLqvi": {
                 "repo_url": "%s",
                 "branch_name": "%s",
                 "github_token": "%s",
@@ -55,7 +55,7 @@ jobs:
           echo "Langflow response: $response"
 
           # Extract response safely
-          result=$(echo "$response" | jq -r '.outputs[0].outputs[0].results.message.text' || echo "needs_comments")
+          result=$(echo "$response" | jq -r '.outputs[0].outputs[1].results.message.text' || echo "needs_comments")
 
           echo "result=$result" >> $GITHUB_OUTPUT
 
