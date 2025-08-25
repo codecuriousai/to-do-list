@@ -62,7 +62,7 @@ jobs:
           echo "Langflow response: $response"
 
           # Extract result message safely using jq (fallback to 'needs_comments')
-          result=$(echo "$response" | jq -r 'data.outputs[0].outputs[1].results.message.text' 2>/dev/null || echo "needs_comments")
+          result=$(echo "$response" | jq -r '.outputs[0].outputs[1].results.message.text' 2>/dev/null || echo "needs_comments")
 
           echo "result=$result" >> $GITHUB_OUTPUT
 
@@ -79,18 +79,18 @@ jobs:
               ? [{ label: 'Merge PR', identifier: 'merge_pr' }]
               : [{ label: 'Post Comments', identifier: 'post_comments' }];
 
-            await github.checks.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: checkName,
-              head_sha: context.payload.pull_request.head.sha,
-              status: 'completed',
-              conclusion: 'neutral',
-              output: {
-                title: checkName,
-                summary: properlyReviewed
-                  ? 'Langflow: PR is properly reviewed. You can merge it.'
-                  : 'Langflow: PR needs comments. Please review and comment.'
-              },
-              actions: actions,
-            });
+            # await github.checks.create({
+            #   owner: context.repo.owner,
+            #   repo: context.repo.repo,
+            #   name: checkName,
+            #   head_sha: context.payload.pull_request.head.sha,
+            #   status: 'completed',
+            #   conclusion: 'neutral',
+            #   output: {
+            #     title: checkName,
+            #     summary: properlyReviewed
+            #       ? 'Langflow: PR is properly reviewed. You can merge it.'
+            #       : 'Langflow: PR needs comments. Please review and comment.'
+            #   },
+            #   actions: actions,
+            # });
