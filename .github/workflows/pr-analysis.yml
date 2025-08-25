@@ -64,60 +64,73 @@ jobs:
         with:
           script: |
             const raw = `${{ steps.langflow_call.outputs.response_json }}`;
+
+            // Verbose logging for easier diagnostics
+            core.info(`Langflow raw response: ${raw}`);
+
             let messageText = '';
-
-            // Log raw for easier debugging
-            core.info(`Langflow raw: ${raw}`);
-
             try {
               const responseObj = JSON.parse(raw);
-              // Log outputs to check nesting
               core.info(`Langflow outputs: ${JSON.stringify(responseObj.outputs)}`);
               messageText =
-                responseObj?.outputs?.?.outputs?.?.results?.message?.text || '';
+                responseObj?.outputs?.?.outputs?.[11]?.results?.message?.text || '';
               core.info(`Langflow messageText: ${messageText}`);
             } catch (err) {
               core.setFailed(`❌ Failed to parse Langflow response JSON: ${err.message}`);
               return;
             }
 
-            // Robust extraction
+            // CLEAN THE MESSAGE BEFORE PARSING
+            function cleanForJSON(text) {
+              let cleaned = text.trim()
+                .replace(/```
+                .replace(/```\s*/gi, '')
+                .replace(/{{/g, '{')              // Replace double curly brackets
+                .replace(/}}/g, '}')
+                .replace(/“|”/g, '"')             // Replace curly quotes
+                .replace(/‘|’/g, "'");
+
+              // Strip leading content not part of a JSON object/array
+              const fitStart = Math.min(
+                cleaned.indexOf('{') === -1 ? Infinity : cleaned.indexOf('{'),
+                cleaned.indexOf('[') === -1 ? Infinity : cleaned.indexOf('[')
+              );
+              if (fitStart !== Infinity) {
+                cleaned = cleaned.substring(fitStart);
+              }
+              return cleaned;
+            }
+
+            // Robust JSON extraction with cleaning and regex
             function extractAndParseJSON(text) {
-              // Strategy 1: Remove markdown
+              const cleaned = cleanForJSON(text);
+              core.info('Attempting extraction from cleaned:');
+              core.info(cleaned);
+
+              // Try parsing directly
               try {
-                const cleaned = text.replace(/``````\s*/gi, '').trim();
                 return JSON.parse(cleaned);
-              } catch (e) {}
+              } catch (e) {
+                core.info('Direct parse failed, trying regex extraction...');
+              }
 
-              // Strategy 2: Extract array
-              try {
-                const arrayMatch = text.match(/\[[\s\S]*\]/);
-                if (arrayMatch) {
+              // Try extracting a JSON array
+              const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+              if (arrayMatch) {
+                try {
                   return JSON.parse(arrayMatch);
-                }
-              } catch (e) {}
+                } catch (e) {}
+              }
 
-              // Strategy 3: Extract object
-              try {
-                const objectMatch = text.match(/\{[\s\S]*\}/);
-                if (objectMatch) {
+              // Try extracting a JSON object
+              const objectMatch = cleaned.match(/\{[\s\S]*\}/);
+              if (objectMatch) {
+                try {
                   return JSON.parse(objectMatch);
-                }
-              } catch (e) {}
+                } catch (e) {}
+              }
 
-              // Strategy 4: Find first JSON after text
-              try {
-                const start = Math.min(
-                  text.indexOf('{') === -1 ? Infinity : text.indexOf('{'),
-                  text.indexOf('[') === -1 ? Infinity : text.indexOf('[')
-                );
-                const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
-                if (start !== Infinity && end !== -1) {
-                  const candidate = text.substring(start, end + 1).trim();
-                  return JSON.parse(candidate);
-                }
-              } catch (e) {}
-
+              core.error('Unable to extract valid JSON from messageText');
               throw new Error('Unable to extract valid JSON from messageText');
             }
 
@@ -130,5 +143,6 @@ jobs:
               return;
             }
 
-            // Whatever you want to do with the parsedResult next...
-            // For example, displaying it in a PR comment
+            // Use parsedResult for PR comments/checks...
+            // Example: core.info for logging, or post comments as needed.
+
