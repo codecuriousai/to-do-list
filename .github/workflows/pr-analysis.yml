@@ -9,10 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      API_KEY: "sk-XZ3b65F8nqZgx00XnLEIyLy4uG40IimyZxth7zMJ7Z4"
-      API_ENDPOINT: "http://localhost:7860/api/v1/run"
-      FLOW_ID: "57b18f1e-0327-4901-9fab-a167422f893e"
-      GITHUB_TOKEN: "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"
+      
 
     steps:
       - name: Checkout code
@@ -21,6 +18,11 @@ jobs:
       - name: Call Langflow API
         id: langflow_call
         run: |
+          API_KEY: "sk-XZ3b65F8nqZgx00XnLEIyLy4uG40IimyZxth7zMJ7Z4"
+          API_ENDPOINT: "http://localhost:7860/api/v1/run"
+          FLOW_ID: "57b18f1e-0327-4901-9fab-a167422f893e"
+          GITHUB_TOKEN: "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"
+          
           repo_url="https://github.com/${{ github.repository }}"
           branch_name="${{ github.event.pull_request.head.ref }}"
           github_token="${GITHUB_TOKEN}"
