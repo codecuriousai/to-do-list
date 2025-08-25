@@ -1,0 +1,31 @@
+name: PR Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  create-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create PR Analysis Check Run with buttons
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const checkName = 'PR Analysis';
+            await github.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: checkName,
+              head_sha: context.payload.pull_request.head.sha,
+              status: 'completed',
+              conclusion: 'neutral',
+              output: {
+                title: checkName,
+                summary: 'Click buttons below to take action on this PR.',
+              },
+              actions: [
+                { label: 'Merge PR', identifier: 'merge_pr' },
+                { label: 'Post Comments', identifier: 'post_comments' }
+              ],
+            });
