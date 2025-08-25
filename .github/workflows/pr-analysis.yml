@@ -131,7 +131,7 @@ jobs:
               analysis = extractAndParseJSON(msgText);
               const assessment = (analysis?.comparison_analysis?.review_assessment || '').toLowerCase();
               const properlyReviewed = assessment === 'properly_reviewed';
-               core.info(`Raw assessment: ${assessment}`);
+               core.info(`Raw assessment: ${analysis?.comparison_analysis?.review_assessment}`);
                 core.info(`Raw properlyReviewed: ${properlyReviewed}`);
 
             } catch (err) {
