@@ -57,7 +57,7 @@ jobs:
           echo "Langflow response:"
           echo "$response"
 
-          echo "response_json=$response.outputs[0].outputs[1].results.message.text" >> $GITHUB_OUTPUT
+          echo "response_json=$response" >> $GITHUB_OUTPUT
 
       - name: Create PR Analysis Check Run with buttons
         uses: actions/github-script@v6
@@ -65,7 +65,18 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const raw = `${{ steps.langflow_call.outputs.response_json }}`;
-
+      
+            let messageText = '';
+      
+            try {
+              const responseObj = JSON.parse(raw);
+              messageText =
+                responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text || '';
+            } catch (err) {
+              core.setFailed('❌ Failed to parse Langflow response JSON.');
+              return;
+            }
+      
             function extractAndParseJSON(text) {
               const strategies = [
                 (t) => t.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim(),
@@ -88,7 +99,7 @@ jobs:
                   return objectMatch ? objectMatch[0] : t;
                 }
               ];
-
+      
               for (const strategy of strategies) {
                 try {
                   const cleaned = strategy(text);
@@ -98,12 +109,42 @@ jobs:
                   continue;
                 }
               }
-
-              throw new Error('Unable to extract valid JSON from response');
+      
+              throw new Error('Unable to extract valid JSON from message text');
             }
-
-            const parsedResponse = extractAndParseJSON(raw);
-            const resultText = JSON.stringify(parsedResponse).toLowerCase();
-            echo "$parsedResponse"
-            echo "$resultText"
+      
+            let parsedResult = {};
+            try {
+              parsedResult = extractAndParseJSON(messageText);
+            } catch (err) {
+              core.setFailed('❌ Failed to extract JSON from Langflow message text.');
+              return;
+            }
+      
+            const resultText = JSON.stringify(parsedResult).toLowerCase();
+      
+            const properlyReviewed =
+              resultText.includes('properly_reviewed') ||
+              resultText.includes('ready to merge');
+      
+            const checkName = 'PR Analysis';
+            const actions = properlyReviewed
+              ? [{ label: 'Merge PR', identifier: 'merge_pr' }]
+              : [{ label: 'Post Comments', identifier: 'post_comments' }];
+      
+            await github.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: checkName,
+              head_sha: context.payload.pull_request.head.sha,
+              status: 'completed',
+              conclusion: 'neutral',
+              output: {
+                title: checkName,
+                summary: properlyReviewed
+                  ? 'Langflow: PR is properly reviewed. You can merge it.'
+                  : 'Langflow: PR needs comments. Please review and comment.'
+              },
+              actions: actions,
+            });
             
