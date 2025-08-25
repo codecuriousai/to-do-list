@@ -32,7 +32,7 @@ jobs:
           # Construct JSON payload using printf to avoid EOF/heredoc issues
           payload=$(printf '{
             "tweaks": {
-              "GitHubBranchPRsFetcher-FLqvi": {
+              "GitHubBranchPRsFetcher-Cdz4k": {
                 "repo_url": "%s",
                 "branch_name": "%s",
                 "github_token": "%s",
