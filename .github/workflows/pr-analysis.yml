@@ -151,7 +151,7 @@ jobs:
     steps:
       - name: Auto-merge
         run: echo "✅ PR was properly reviewed. Proceeding with merge (simulate Langflow Agent)."
-              # core.setOutput("pr_analysis_json", JSON.stringify(needs.analyze-pr.outputs.analysis))
+              core.setOutput("Auto-merge PR", needs.analyze-pr.outputs.properlyReviewed)
 
   # Post comment if properlyReviewed is false
   comment-pr:
@@ -161,4 +161,4 @@ jobs:
     steps:
       - name: Post comment
         run: echo "⚠️ PR needs more review. Posting comment instead of merging."
-            # core.setOutput("pr_analysis_json", JSON.stringify(needs.analyze-pr.outputs.analysis))
+            core.setOutput("Post Comments", needs.analyze-pr.outputs.properlyReviewed)
