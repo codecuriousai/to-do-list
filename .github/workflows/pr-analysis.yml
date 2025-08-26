@@ -171,55 +171,52 @@ jobs:
         run: |
           echo "🧪 Creating GitHub Check Run..."
       
-          # Determine conclusion
+          # Set status based on result
           conclusion="failure"
           if [ "$PROPERLY_REVIEWED" = "true" ]; then
             conclusion="success"
           fi
       
-          echo "Conclusion: $conclusion"
+          # Format the summary using Markdown
+          markdown_summary="### 🧾 PR Analysis Result
       
-          # Escape summary details safely
-          escaped_summary=$(jq -Rs . <<< "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.Details:$ANALYSIS_JSON")
+      | Key                | Value               |
+      |--------------------|---------------------|
+      | Properly Reviewed? | $PROPERLY_REVIEWED  |
+      | Conclusion         | $conclusion         |
       
-          # Build full JSON payload for Check Run
-          payload=$(jq -n \
-            --arg name "Langflow PR Analysis" \
-            --arg head_sha "$SHA" \
-            --arg conclusion "$conclusion" \
-            --arg title "PR Analysis Summary" \
-            --arg summary "$escaped_summary" \
-            '{
-              name: $name,
-              head_sha: $head_sha,
-              status: "completed",
-              conclusion: $conclusion,
-              output: {
-                title: $title,
-                summary: $summary
-              }
-            }')
+      <details>
+      <summary>🔍 Analysis JSON (raw)</summary>
       
-          echo "📦 Payload:"
-          echo "$payload"
+      \`\`\`json
+      $ANALYSIS_JSON
+      \`\`\`
       
-          # Make the API call
-          response=$(curl -s -w "%{http_code}" -o response.json \
-            -X POST "https://api.github.com/repos/$REPO/check-runs" \
+      </details>
+      "
+      
+          # Safely encode summary string
+          summary_json=$(jq -n --arg title "Langflow PR Analysis" --arg summary "$markdown_summary" \
+            '{name: $title, head_sha: env.SHA, status: "completed", conclusion: env.conclusion, output: {title: $title, summary: $summary}}')
+      
+          echo "📦 Payload for check-run:"
+          echo "$summary_json" | jq .
+      
+          # Send check run via GitHub API
+          http_code=$(curl -s -o output.json -w "%{http_code}" -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            -d "$payload")
+            https://api.github.com/repos/$REPO/check-runs \
+            -d "$summary_json")
       
-          # Print response body
-          cat response.json
+          cat output.json
       
-          if [ "$response" -ne 201 ]; then
-            echo "❌ Failed to create check run (HTTP $response)"
+          if [ "$http_code" -ne 201 ]; then
+            echo "❌ Failed to create check run. HTTP $http_code"
             exit 1
-          else
-            echo "✅ Check run created successfully"
           fi
+
+        echo "✅ Check run created successfully!"
 
   merge-pr:
     needs: analyze-pr
