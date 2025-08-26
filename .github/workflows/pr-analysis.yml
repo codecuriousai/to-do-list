@@ -143,22 +143,22 @@ jobs:
 
             core.setOutput("pr_analysis_json", JSON.stringify(analysis));
 
-  # # Auto-merge PR if properlyReviewed is true
-  # merge-pr:
-  #   needs: analyze-pr
-  #   runs-on: ubuntu-latest
-  #   if: needs.analyze-pr.outputs.properlyReviewed == 'true'
-  #   steps:
-  #     - name: Auto-merge
-  #       run: echo "✅ PR was properly reviewed. Proceeding with merge (simulate Langflow Agent)."
-  #             # core.setOutput("pr_analysis_json", JSON.stringify(needs.analyze-pr.outputs.analysis))
+  # Auto-merge PR if properlyReviewed is true
+  merge-pr:
+    needs: analyze-pr
+    runs-on: ubuntu-latest
+    if: needs.analyze-pr.outputs.properlyReviewed == 'true'
+    steps:
+      - name: Auto-merge
+        run: echo "✅ PR was properly reviewed. Proceeding with merge (simulate Langflow Agent)."
+              # core.setOutput("pr_analysis_json", JSON.stringify(needs.analyze-pr.outputs.analysis))
 
-  # # Post comment if properlyReviewed is false
-  # comment-pr:
-  #   needs: analyze-pr
-  #   runs-on: ubuntu-latest
-  #   if: needs.analyze-pr.outputs.properlyReviewed == 'false'
-  #   steps:
-  #     - name: Post comment
-  #       run: echo "⚠️ PR needs more review. Posting comment instead of merging."
-  #           # core.setOutput("pr_analysis_json", JSON.stringify(needs.analyze-pr.outputs.analysis))
+  # Post comment if properlyReviewed is false
+  comment-pr:
+    needs: analyze-pr
+    runs-on: ubuntu-latest
+    if: needs.analyze-pr.outputs.properlyReviewed == 'false'
+    steps:
+      - name: Post comment
+        run: echo "⚠️ PR needs more review. Posting comment instead of merging."
+            # core.setOutput("pr_analysis_json", JSON.stringify(needs.analyze-pr.outputs.analysis))
