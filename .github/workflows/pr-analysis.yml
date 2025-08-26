@@ -288,11 +288,11 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const mergeAnalysisRaw = `${{ steps.merge.outputs.pr_analysis_json }}`;
+            const mergeAnalysisRaw = ${{ steps.merge.outputs.pr_analysis_json }};
             
             let assessmentText = 'Unknown';
             try {
-              const mergeAnalysis = JSON.parse(mergeAnalysisRaw);
+              const mergeAnalysis = mergeAnalysisRaw;
               assessmentText = mergeAnalysis.pull_requests[0].merge_readiness.status || 'Not found';
             } catch (e) {
               core.warning("Failed to parse analysis JSON: " + e.message);
