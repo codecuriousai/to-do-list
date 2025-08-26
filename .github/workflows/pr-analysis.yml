@@ -133,6 +133,7 @@ jobs:
             } catch (err) {
               core.setFailed(`Failed to extract or parse JSON from message text: ${err.message}`);
             }
+            
       - name: Post commit status (as alternative to check-run)
         uses: actions/github-script@v6
         with:
@@ -184,7 +185,7 @@ jobs:
 
           payload=$(printf '{
             "tweaks": {
-              "GitHubBranchPRsFetcher-Cdz4k": {
+              "GitHubOpenPRsFetcher-VgGay": {
                 "repo_url": "%s",
                 "branch_name": "%s",
                 "github_token": "%s",
