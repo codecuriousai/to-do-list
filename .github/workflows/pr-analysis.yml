@@ -142,7 +142,7 @@ jobs:
             core.info(`Parsed PR Analysis JSON: ${JSON.stringify(analysis, null, 2)}`);
 
             core.setOutput("pr_analysis_json", JSON.stringify(analysis));
-            core.setOutput("properlyReviewed", properlyReviewed.toString());
+            # core.setOutput("properlyReviewed", properlyReviewed.toString());
             
   # Auto-merge PR if properlyReviewed is true
   merge-pr:
