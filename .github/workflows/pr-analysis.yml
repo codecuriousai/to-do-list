@@ -144,6 +144,7 @@ jobs:
           echo "Analysis output:"
           let analysisJson = ${{ needs.analyze-pr.outputs.analysis }};
           let analysis = JSON.parse(analysisJson);
+          echo "$analysis"
           # core.info(`Raw assessment: ${analysis?.comparison_analysis?.review_assessment}`);
 
   comment-pr:
@@ -154,5 +155,6 @@ jobs:
       - name: Post comment
         run: |
           echo "⚠️ PR needs more review. Posting comment instead of merging."
-          echo "Post:"
-          echo "${{ needs.analyze-pr.outputs.analysis }}"
+          let analysisJson = ${{ needs.analyze-pr.outputs.analysis }};
+          let analysis = JSON.parse(analysisJson);
+          echo "$analysis"
