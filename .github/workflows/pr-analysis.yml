@@ -141,7 +141,7 @@ jobs:
             const sha = context.payload.pull_request.head.sha;
             const repo = context.repo;
       
-            await github.repos.createCommitStatus({
+            await github.rest.repos.createCommitStatus({
               owner: repo.owner,
               repo: repo.repo,
               sha: sha,
