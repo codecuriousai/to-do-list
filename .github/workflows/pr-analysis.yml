@@ -166,8 +166,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.LANGFLOW_GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
-          PROPERLY_REVIEWED: ${{ needs.analyze-pr.outputs.properlyReviewed }}
-          ANALYSIS_JSON: ${{ needs.analyze-pr.outputs.analysis }}
+          PROPERLY_REVIEWED: ${{ steps.analysis.outputs.properlyReviewed }}
+          ANALYSIS_JSON: ${{ steps.analysis.outputs.pr_analysis_json }}
         run: |
           conclusion="failure"
           if [ "$PROPERLY_REVIEWED" = "true" ]; then
