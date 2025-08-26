@@ -163,7 +163,7 @@ jobs:
             
       - name: Create GitHub Check Run via REST API
         env:
-          GITHUB_TOKEN: ${{ secrets.LANGFLOW_GITHUB_TOKEN2 }}  # Use built-in GitHub token or valid app token
+          GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}  # Use built-in GitHub token or valid app token
           REPO: ${{ github.repository }}
           SHA: ${{ github.event.pull_request.head.sha }}
           PROPERLY_REVIEWED: ${{ steps.analysis.outputs.properlyReviewed }}
