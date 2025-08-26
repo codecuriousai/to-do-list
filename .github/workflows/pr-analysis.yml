@@ -152,7 +152,7 @@ jobs:
       - name: Auto-merge
         run: echo "✅ PR was properly reviewed. Proceeding with merge (simulate Langflow Agent)."
               echo "needs.analyze-pr.outputs.properlyReviewed:"
-              echo "$needs.analyze-pr.outputs.properlyReviewed"
+              echo "${{ needs.analyze-pr.outputs.properlyReviewed }}"
 
   # Post comment if properlyReviewed is false
   comment-pr:
@@ -163,4 +163,4 @@ jobs:
       - name: Post comment
         run: echo "⚠️ PR needs more review. Posting comment instead of merging."
               echo "Post:"
-              echo "$needs.analyze-pr.outputs.properlyReviewed"
+              echo "${{ needs.analyze-pr.outputs.properlyReviewed }}"
