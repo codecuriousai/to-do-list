@@ -7,9 +7,6 @@ on:
 jobs:
   analyze-pr:
     runs-on: ubuntu-latest
-    outputs:
-      analysis: ${{ steps.analysis.outputs.pr_analysis_json }}
-      
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -135,7 +132,8 @@ jobs:
               const assessment = (analysis[0]?.comparison_analysis?.review_assessment || '').toLowerCase();
               const properlyReviewed = assessment === 'properly_reviewed';
                core.info(`Raw assessment: ${analysis[0]?.comparison_analysis?.review_assessment}`);
-                core.info(`Raw properlyReviewed: ${properlyReviewed}`);
+               core.info(`Raw properlyReviewed: ${properlyReviewed}`);
+               core.setOutput("properlyReviewed", properlyReviewed);
 
             } catch (err) {
               core.setFailed(`❌ Failed to extract or parse JSON from message text: ${err.message}`);
@@ -154,8 +152,8 @@ jobs:
     steps:
       - name: Auto-merge
         run: echo "✅ PR was properly reviewed. Proceeding with merge (simulate Langflow Agent)."
-              echo "needs.analyze-pr.outputs.properlyReviewed:"
-              echo "${{ needs.analyze-pr.outputs.analysis[0] }}"
+             echo "Analysis output:"
+             echo "${{ needs.analyze-pr.outputs.analysis }}"
 
   # Post comment if properlyReviewed is false
   comment-pr:
@@ -165,5 +163,5 @@ jobs:
     steps:
       - name: Post comment
         run: echo "⚠️ PR needs more review. Posting comment instead of merging."
-              echo "Post:"
-              echo "${{ needs.analyze-pr.outputs.analysis[0] }}"
+             echo "Analysis output:"
+             echo "${{ needs.analyze-pr.outputs.analysis }}"
