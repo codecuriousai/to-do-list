@@ -163,37 +163,64 @@ jobs:
             
       - name: Create GitHub Check Run via REST API
         env:
-          GITHUB_TOKEN: ${{ secrets.LANGFLOW_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.LANGFLOW_GITHUB_TOKEN }}  # Use built-in GitHub token or valid app token
           REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ github.event.pull_request.head.sha }}
           PROPERLY_REVIEWED: ${{ steps.analysis.outputs.properlyReviewed }}
           ANALYSIS_JSON: ${{ steps.analysis.outputs.pr_analysis_json }}
         run: |
+          echo "🧪 Creating GitHub Check Run..."
+      
+          # Determine conclusion
           conclusion="failure"
           if [ "$PROPERLY_REVIEWED" = "true" ]; then
             conclusion="success"
           fi
       
-          body=$(jq -n --arg title "PR Analysis Summary" \
-                       --arg summary "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.\n\nDetails:\n$ANALYSIS_JSON" \
-                       '{output: {title: $title, summary: $summary}}')
+          echo "Conclusion: $conclusion"
       
-          curl -s -X POST \
+          # Escape summary details safely
+          escaped_summary=$(jq -Rs . <<< "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.Details:$ANALYSIS_JSON")
+      
+          # Build full JSON payload for Check Run
+          payload=$(jq -n \
+            --arg name "Langflow PR Analysis" \
+            --arg head_sha "$SHA" \
+            --arg conclusion "$conclusion" \
+            --arg title "PR Analysis Summary" \
+            --arg summary "$escaped_summary" \
+            '{
+              name: $name,
+              head_sha: $head_sha,
+              status: "completed",
+              conclusion: $conclusion,
+              output: {
+                title: $title,
+                summary: $summary
+              }
+            }')
+      
+          echo "📦 Payload:"
+          echo "$payload"
+      
+          # Make the API call
+          response=$(curl -s -w "%{http_code}" -o response.json \
+            -X POST "https://api.github.com/repos/$REPO/check-runs" \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$REPO/check-runs" \
-            -d @- <<EOF
-          {
-            "name": "PR Analysis",
-            "head_sha": "$SHA",
-            "status": "completed",
-            "conclusion": "$conclusion",
-            "output": {
-              "title": "PR Analysis Summary",
-              "summary": "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.\n\nDetails:\n$ANALYSIS_JSON"
-            }
-          }
-          EOF
+            -H "Content-Type: application/json" \
+            -d "$payload")
+      
+          # Print response body
+          cat response.json
+      
+          if [ "$response" -ne 201 ]; then
+            echo "❌ Failed to create check run (HTTP $response)"
+            exit 1
+          else
+            echo "✅ Check run created successfully"
+          fi
+
   merge-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
