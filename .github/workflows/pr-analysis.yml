@@ -160,7 +160,40 @@ jobs:
               description: `PR analysis completed: ${assessmentText}` ,
               target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
             });
-
+            
+      - name: Create GitHub Check Run via REST API
+        env:
+          GITHUB_TOKEN: ${{ secrets.LANGFLOW_GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          PROPERLY_REVIEWED: ${{ needs.analyze-pr.outputs.properlyReviewed }}
+          ANALYSIS_JSON: ${{ needs.analyze-pr.outputs.analysis }}
+        run: |
+          conclusion="failure"
+          if [ "$PROPERLY_REVIEWED" = "true" ]; then
+            conclusion="success"
+          fi
+      
+          body=$(jq -n --arg title "PR Analysis Summary" \
+                       --arg summary "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.\n\nDetails:\n$ANALYSIS_JSON" \
+                       '{output: {title: $title, summary: $summary}}')
+      
+          curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/check-runs" \
+            -d @- <<EOF
+          {
+            "name": "PR Analysis",
+            "head_sha": "$SHA",
+            "status": "completed",
+            "conclusion": "$conclusion",
+            "output": {
+              "title": "PR Analysis Summary",
+              "summary": "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.\n\nDetails:\n$ANALYSIS_JSON"
+            }
+          }
+          EOF
   merge-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
