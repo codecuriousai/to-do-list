@@ -180,20 +180,20 @@ jobs:
           # Format the summary using Markdown
           markdown_summary="### 🧾 PR Analysis Result
       
-      | Key                | Value               |
-      |--------------------|---------------------|
-      | Properly Reviewed? | $PROPERLY_REVIEWED  |
-      | Conclusion         | $conclusion         |
+          | Key                | Value               |
+          |--------------------|---------------------|
+          | Properly Reviewed? | $PROPERLY_REVIEWED  |
+          | Conclusion         | $conclusion         |
+          
+          <details>
+          <summary>🔍 Analysis JSON (raw)</summary>
       
-      <details>
-      <summary>🔍 Analysis JSON (raw)</summary>
-      
-      \`\`\`json
-      $ANALYSIS_JSON
-      \`\`\`
-      
-      </details>
-      "
+          \`\`\`json
+          $ANALYSIS_JSON
+          \`\`\`
+          
+          </details>
+          "
       
           # Safely encode summary string
           summary_json=$(jq -n --arg title "Langflow PR Analysis" --arg summary "$markdown_summary" \
@@ -216,7 +216,7 @@ jobs:
             exit 1
           fi
 
-        echo "✅ Check run created successfully!"
+          echo "✅ Check run created successfully!"
 
   merge-pr:
     needs: analyze-pr
