@@ -165,3 +165,11 @@ jobs:
         run: echo "⚠️ PR needs more review. Posting comment instead of merging."
              echo "Analysis output:"
              echo "${{ needs.analyze-pr.outputs.analysis }}"
+             
+      - name: Parse and log first analysis object
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const analysis = JSON.parse('${{ needs.analyze-pr.outputs.analysis }}');
+            echo "First analysis object:" 
+            echo "$analysis";       
