@@ -7,6 +7,9 @@ on:
 jobs:
   analyze-pr:
     runs-on: ubuntu-latest
+    outputs:
+      analysis: ${{ steps.analysis.outputs.pr_analysis_json }}
+      properlyReviewed: ${{ steps.analysis.outputs.properlyReviewed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -14,10 +17,10 @@ jobs:
       - name: Call Langflow API
         id: langflow_call
         env:
-          API_KEY: "AstraCS:doJijFJwFioApBaswsaRBigy:5863ee7b2f203becbd015d24db02193c98d6aaccd317b4c247c70b12ffa88bc4"
+          API_KEY: ${{ secrets.LANGFLOW_API_KEY }}
           API_ENDPOINT: "https://api.langflow.astra.datastax.com/lf/720b3827-93a5-40a1-9c93-0a974680f48c/api/v1/run"
           FLOW_ID: "43913ec5-a0de-44b8-b31b-44019176489d"
-          GITHUB_TOKEN: ${{ secrets.LANGFLOW_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           repo_url="https://github.com/${{ github.repository }}"
           branch_name="PR-Comments-Post"
@@ -26,8 +29,6 @@ jobs:
           max_pages=5
           pr_number=${{ github.event.pull_request.number }}
           session_id="user_$(date +%s)"
-
-          echo "Calling Langflow for PR #$pr_number on branch $branch_name"
 
           payload=$(printf '{
             "tweaks": {
@@ -45,16 +46,10 @@ jobs:
           }' \
           "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id")
 
-          echo "Calling Langflow with payload:"
-          echo "$payload"
-
           response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $API_KEY" \
             -d "$payload")
-
-          echo "Langflow raw response:"
-          echo "$response"
 
           echo "response_json=$response" >> $GITHUB_OUTPUT
 
@@ -65,12 +60,11 @@ jobs:
           LANGFLOW_RESPONSE_JSON: ${{ steps.langflow_call.outputs.response_json }}
         with:
           script: |
-            
             function extractAndParseJSON(text) {
               const strategies = [
                 (t) =>
                   t
-                    .replace(/```json\s*/gi, '')
+                    .replace(/```
                     .replace(/```\s*/gi, '')
                     .trim(),
 
@@ -99,9 +93,8 @@ jobs:
               for (const strategy of strategies) {
                 try {
                   const cleaned = strategy(text);
-                  const parsed = JSON.parse(cleaned);
-                  return parsed;
-                } catch (e) {
+                  return JSON.parse(cleaned);
+                } catch {
                   continue;
                 }
               }
@@ -116,13 +109,13 @@ jobs:
             try {
               responseObj = JSON.parse(raw);
             } catch (err) {
-              core.setFailed(`❌ Failed to parse Langflow response JSON: ${err.message}`);
+              core.setFailed(`Failed to parse Langflow response JSON: ${err.message}`);
               return;
             }
 
             const msgText = responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text;
             if (!msgText) {
-              core.setFailed('❌ No message text found in Langflow response outputs.');
+              core.setFailed('No message text found in Langflow response outputs.');
               return;
             }
 
@@ -131,45 +124,33 @@ jobs:
               analysis = extractAndParseJSON(msgText);
               const assessment = (analysis[0]?.comparison_analysis?.review_assessment || '').toLowerCase();
               const properlyReviewed = assessment === 'properly_reviewed';
-               core.info(`Raw assessment: ${analysis[0]?.comparison_analysis?.review_assessment}`);
-               core.info(`Raw properlyReviewed: ${properlyReviewed}`);
-               core.setOutput("properlyReviewed", properlyReviewed);
 
+              core.info(`Raw assessment: ${analysis[0]?.comparison_analysis?.review_assessment}`);
+              core.info(`Raw properlyReviewed: ${properlyReviewed}`);
+
+              core.setOutput("pr_analysis_json", JSON.stringify(analysis));
+              core.setOutput("properlyReviewed", properlyReviewed.toString());
             } catch (err) {
-              core.setFailed(`❌ Failed to extract or parse JSON from message text: ${err.message}`);
-              return;
+              core.setFailed(`Failed to extract or parse JSON from message text: ${err.message}`);
             }
-
-            core.info(`Parsed PR Analysis JSON: ${JSON.stringify(analysis, null, 2)}`);
-
-            core.setOutput("pr_analysis_json", JSON.stringify(analysis));
-            
-  # Auto-merge PR if properlyReviewed is true
   merge-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
-    if: needs.analyze-pr.outputs.properlyReviewed == true
+    if: needs.analyze-pr.outputs.properlyReviewed == 'true'
     steps:
       - name: Auto-merge
-        run: echo "✅ PR was properly reviewed. Proceeding with merge (simulate Langflow Agent)."
-             echo "Analysis output:"
-             echo "${{ needs.analyze-pr.outputs.analysis }}"
+        run: |
+          echo "✅ PR was properly reviewed. Proceeding with merge (simulate Langflow Agent)."
+          echo "Analysis output:"
+          echo "${{ needs.analyze-pr.outputs.analysis }}"
 
-  # Post comment if properlyReviewed is false
   comment-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
-    if: needs.analyze-pr.outputs.properlyReviewed == false
+    if: needs.analyze-pr.outputs.properlyReviewed == 'false'
     steps:
       - name: Post comment
-        run: echo "⚠️ PR needs more review. Posting comment instead of merging."
-             echo "Analysis output:"
-             echo "${{ needs.analyze-pr.outputs.analysis }}"
-             
-      - name: Parse and log first analysis object
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const analysis = JSON.parse('${{ needs.analyze-pr.outputs.analysis }}');
-            echo "First analysis object:" 
-            echo "$analysis";       
+        run: |
+          echo "⚠️ PR needs more review. Posting comment instead of merging."
+          echo "Post:"
+          echo "${{ needs.analyze-pr.outputs.analysis }}"
