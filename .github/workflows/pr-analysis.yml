@@ -147,7 +147,7 @@ jobs:
   merge-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
-    if: needs.analyze-pr.outputs.properlyReviewed == 'true'
+    if: needs.analyze-pr.outputs.properlyReviewed == true
     steps:
       - name: Auto-merge
         run: echo "✅ PR was properly reviewed. Proceeding with merge (simulate Langflow Agent)."
@@ -157,7 +157,7 @@ jobs:
   comment-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
-    if: needs.analyze-pr.outputs.properlyReviewed == 'false'
+    if: needs.analyze-pr.outputs.properlyReviewed == false
     steps:
       - name: Post comment
         run: echo "⚠️ PR needs more review. Posting comment instead of merging."
