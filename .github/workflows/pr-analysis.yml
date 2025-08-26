@@ -174,7 +174,35 @@ jobs:
           # let analysis = JSON.parse(analysisJson);
           # echo "$analysis"
           # core.info(`Raw assessment: ${analysis?.comparison_analysis?.review_assessment}`);
+      
+      - name: Check Merge status
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const analysisRaw = `${{ steps.analysis.outputs.pr_analysis_json }}`;
+            const properlyReviewed = `${{ steps.analysis.outputs.properlyReviewed }}` === 'true';
 
+            let assessmentText = 'Unknown';
+            try {
+              const analysis = JSON.parse(analysisRaw);
+              assessmentText = analysis?.[0]?.comparison_analysis?.review_assessment || 'Not found';
+            } catch (e) {
+              core.warning("Failed to parse analysis JSON: " + e.message);
+            }
+            const conclusion = 'success'; // or 'failure', etc.
+            const sha = context.payload.pull_request.head.sha;
+            const repo = context.repo;
+      
+            await github.rest.repos.createCommitStatus({
+              owner: repo.owner,
+              repo: repo.repo,
+              sha: sha,
+              state: conclusion,
+              context: 'Merge Status',
+              description: `Merge Status completed: READY_FOR_MERGE` ,
+              target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            });
+            
   comment-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
@@ -186,3 +214,31 @@ jobs:
           # let analysisJson = ${{ needs.analyze-pr.outputs.analysis }};
           # let analysis = JSON.parse(analysisJson);
           # echo "$analysis"
+      
+      - name: Post Comments status
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const analysisRaw = `${{ steps.analysis.outputs.pr_analysis_json }}`;
+            const properlyReviewed = `${{ steps.analysis.outputs.properlyReviewed }}` === 'true';
+
+            let assessmentText = 'Unknown';
+            try {
+              const analysis = JSON.parse(analysisRaw);
+              assessmentText = analysis?.[0]?.comparison_analysis?.review_assessment || 'Not found';
+            } catch (e) {
+              core.warning("Failed to parse analysis JSON: " + e.message);
+            }
+            const conclusion = 'success'; // or 'failure', etc.
+            const sha = context.payload.pull_request.head.sha;
+            const repo = context.repo;
+      
+            await github.rest.repos.createCommitStatus({
+              owner: repo.owner,
+              repo: repo.repo,
+              sha: sha,
+              state: conclusion,
+              context: 'Post Comments Status',
+              description: `Post Comments Status completed: ADDED_COMMENTS ` ,
+              target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            });    
