@@ -161,54 +161,6 @@ jobs:
               target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
             });
             
-      - name: Create GitHub Check Run via REST API
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}  # Use built-in GitHub token or valid app token
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.event.pull_request.head.sha }}
-          PROPERLY_REVIEWED: ${{ steps.analysis.outputs.properlyReviewed }}
-          ANALYSIS_JSON: ${{ steps.analysis.outputs.pr_analysis_json }}
-        run: |
-          echo "🧪 Creating simple GitHub Check Run..."
-      
-          payload=$(jq -n \
-            --arg name "Test Check Run" \
-            --arg sha "$SHA" \
-            --arg status "completed" \
-            --arg conclusion "success" \
-            --arg title "Test Check Run Summary" \
-            --arg summary "✅ This is a simple check run to test the API." \
-            '{
-              name: $name,
-              head_sha: $sha,
-              status: $status,
-              conclusion: $conclusion,
-              output: {
-                title: $title,
-                summary: $summary
-              }
-            }')
-      
-          echo "📦 Sending payload:"
-          echo "$payload" | jq .
-      
-          http_code=$(curl -s -o response.json -w "%{http_code}" -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            "https://api.github.com/repos/$REPO/check-runs" \
-            -d "$payload")
-      
-          echo "🔁 Response:"
-          cat response.json
-      
-          if [ "$http_code" -ne 201 ]; then
-            echo "❌ Failed to create check run (HTTP $http_code)"
-            exit 1
-          fi
-      
-          echo "✅ Check run created successfully!"
-
   merge-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
