@@ -275,10 +275,11 @@ jobs:
             let mergeAnalysis;
             try {
               mergeAnalysis = extractAndParseJSON(msgText);
-              
+              core.info(`Raw mergeAnalysis: ${JSON.stringify(mergeAnalysis, null, 2)}`);
+
               core.info(`Raw assessment: ${mergeAnalysis}`);
 
-              core.setOutput("pr_analysis_json", JSON.stringify(mergeAnalysis));
+              core.setOutput("pr_analysis_json", JSON.stringify(mergeAnalysis, null, 2));
             } catch (err) {
               core.setFailed(`Failed to extract or parse JSON from message text: ${err.message}`);
             }
