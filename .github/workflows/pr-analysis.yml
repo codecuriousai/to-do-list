@@ -8,7 +8,7 @@ jobs:
   analyze-pr:
     runs-on: ubuntu-latest
     outputs:
-      analysis: ${{ steps.analysis.outputs.analysis }}
+      analysis: ${{ steps.analysis.outputs.pr_analysis_json }}
       
     steps:
       - name: Checkout code
@@ -145,7 +145,6 @@ jobs:
             core.info(`Parsed PR Analysis JSON: ${JSON.stringify(analysis, null, 2)}`);
 
             core.setOutput("pr_analysis_json", JSON.stringify(analysis));
-            echo "analysis=$analysis" >> $GITHUB_OUTPUT
             
   # Auto-merge PR if properlyReviewed is true
   merge-pr:
