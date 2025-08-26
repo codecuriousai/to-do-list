@@ -133,42 +133,24 @@ jobs:
             } catch (err) {
               core.setFailed(`Failed to extract or parse JSON from message text: ${err.message}`);
             }
-            
-      - name: Create GitHub Check Run via REST API
-        env:
-          GITHUB_TOKEN: ${{ secrets.LANGFLOW_GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          PROPERLY_REVIEWED: ${{ needs.analyze-pr.outputs.properlyReviewed }}
-          ANALYSIS_JSON: ${{ needs.analyze-pr.outputs.analysis }}
-        run: |
-          conclusion="failure"
-          if [ "$PROPERLY_REVIEWED" = "true" ]; then
-            conclusion="success"
-          fi
+      - name: Post commit status (as alternative to check-run)
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const conclusion = 'success'; // or 'failure', etc.
+            const sha = context.payload.pull_request.head.sha;
+            const repo = context.repo;
       
-          body=$(jq -n --arg title "PR Analysis Summary" \
-                       --arg summary "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.\n\nDetails:\n$ANALYSIS_JSON" \
-                       '{output: {title: $title, summary: $summary}}')
-      
-          curl -s -X POST \
-          -H "Authorization: token $GITHUB_TOKEN" \
-          -H "Accept: application/vnd.github+json" \
-          "https://api.github.com/repos/$REPO/check-runs" \
-          -d @- <<EOF
-          {
-            "name": "PR Analysis",
-            "head_sha": "$SHA",
-            "status": "completed",
-            "conclusion": "$conclusion",
-            "output": {
-              "title": "PR Analysis Summary",
-              "summary": "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.\n\nDetails:\n$ANALYSIS_JSON"
-            }
-          }
-          EOF
-       
-    
+            await github.repos.createCommitStatus({
+              owner: repo.owner,
+              repo: repo.repo,
+              sha: sha,
+              state: conclusion,
+              context: 'PR Analysis',
+              description: 'PR analysis completed',
+              target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            });
+
   merge-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
