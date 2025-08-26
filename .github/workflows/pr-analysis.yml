@@ -292,7 +292,7 @@ jobs:
             let assessmentText = 'Unknown';
             try {
               const mergeAnalysis = JSON.parse(mergeAnalysisRaw);
-              assessmentText = mergeAnalysis?.[0]?.comparison_analysis?.review_assessment || 'Not found';
+              assessmentText = mergeAnalysis.pull_requests[0].merge_readiness.status || 'Not found';
             } catch (e) {
               core.warning("Failed to parse analysis JSON: " + e.message);
             }
@@ -306,7 +306,7 @@ jobs:
               sha: sha,
               state: conclusion,
               context: 'Merge Status',
-              description: `Merge Status completed: READY_FOR_MERGE` ,
+              description: `Merge Status completed: ${assessmentText}` ,
               target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
             });
             
