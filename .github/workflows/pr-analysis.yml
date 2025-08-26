@@ -64,7 +64,7 @@ jobs:
               const strategies = [
                 (t) =>
                   t
-                    .replace(/```
+                    .replace(/```json\s*/gi, '')
                     .replace(/```\s*/gi, '')
                     .trim(),
 
