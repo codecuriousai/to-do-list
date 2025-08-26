@@ -133,16 +133,40 @@ jobs:
             } catch (err) {
               core.setFailed(`Failed to extract or parse JSON from message text: ${err.message}`);
             }
-      - name: Create PR Analysis Check Run
-        uses: peter-evans/create-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          name: PR Analysis
-          conclusion: ${{ needs.analyze-pr.outputs.properlyReviewed == 'true' && 'success' || 'failure' }}
-          output_title: PR Analysis Summary
-          output_summary: |
-            PR Analysis has completed with conclusion: ${{ needs.analyze-pr.outputs.properlyReviewed }}.
-            Details: ${{ needs.analyze-pr.outputs.analysis }}       
+            
+      - name: Create GitHub Check Run via REST API
+        env:
+          GITHUB_TOKEN: ${{ secrets.LANGFLOW_API_KEY }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          PROPERLY_REVIEWED: ${{ needs.analyze-pr.outputs.properlyReviewed }}
+          ANALYSIS_JSON: ${{ needs.analyze-pr.outputs.analysis }}
+        run: |
+          conclusion="failure"
+          if [ "$PROPERLY_REVIEWED" = "true" ]; then
+            conclusion="success"
+          fi
+      
+          body=$(jq -n --arg title "PR Analysis Summary" \
+                       --arg summary "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.\n\nDetails:\n$ANALYSIS_JSON" \
+                       '{output: {title: $title, summary: $summary}}')
+      
+          curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/check-runs" \
+            -d @- <<EOF
+      {
+        "name": "PR Analysis",
+        "head_sha": "$SHA",
+        "status": "completed",
+        "conclusion": "$conclusion",
+        "output": {
+          "title": "PR Analysis Summary",
+          "summary": "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.\n\nDetails:\n$ANALYSIS_JSON"
+        }
+      }
+      EOF
     
   merge-pr:
     needs: analyze-pr
