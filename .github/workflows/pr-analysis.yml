@@ -137,6 +137,16 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
+            const analysisRaw = `${{ needs.analyze-pr.outputs.analysis }}`;
+            const properlyReviewed = `${{ needs.analyze-pr.outputs.properlyReviewed }}` === 'true';
+
+            let assessmentText = 'Unknown';
+            try {
+              const analysis = JSON.parse(analysisRaw);
+              assessmentText = analysis?.[0]?.comparison_analysis?.review_assessment || 'Not found';
+            } catch (e) {
+              core.warning("Failed to parse analysis JSON: " + e.message);
+            }
             const conclusion = 'success'; // or 'failure', etc.
             const sha = context.payload.pull_request.head.sha;
             const repo = context.repo;
@@ -147,7 +157,7 @@ jobs:
               sha: sha,
               state: conclusion,
               context: 'PR Analysis',
-              description: 'PR analysis completed',
+              description: `PR analysis completed: ${assessmentText}` ,
               target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
             });
 
