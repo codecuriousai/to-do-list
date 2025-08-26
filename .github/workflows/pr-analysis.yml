@@ -152,10 +152,10 @@ jobs:
                        '{output: {title: $title, summary: $summary}}')
       
           curl -s -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$REPO/check-runs" \
-            -d @- <<EOF
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/$REPO/check-runs" \
+          -d @- <<EOF
           {
             "name": "PR Analysis",
             "head_sha": "$SHA",
@@ -166,7 +166,8 @@ jobs:
               "summary": "PR Analysis completed with conclusion: $PROPERLY_REVIEWED.\n\nDetails:\n$ANALYSIS_JSON"
             }
           }
-          EOF       
+          EOF
+       
     
   merge-pr:
     needs: analyze-pr
