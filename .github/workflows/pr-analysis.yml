@@ -133,21 +133,17 @@ jobs:
             } catch (err) {
               core.setFailed(`Failed to extract or parse JSON from message text: ${err.message}`);
             }
-  create-check-run:
-    needs: analyze-pr
-    runs-on: ubuntu-latest
-    steps:
       - name: Create PR Analysis Check Run
-        uses: actions/create-check@v2
+        uses: peter-evans/create-check@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           name: PR Analysis
           conclusion: ${{ needs.analyze-pr.outputs.properlyReviewed == 'true' && 'success' || 'failure' }}
           output_title: PR Analysis Summary
           output_summary: |
             PR Analysis has completed with conclusion: ${{ needs.analyze-pr.outputs.properlyReviewed }}.
-
-            Details: ${{ needs.analyze-pr.outputs.analysis }}          
+            Details: ${{ needs.analyze-pr.outputs.analysis }}       
+    
   merge-pr:
     needs: analyze-pr
     runs-on: ubuntu-latest
