@@ -163,59 +163,50 @@ jobs:
             
       - name: Create GitHub Check Run via REST API
         env:
-          GITHUB_TOKEN: ${{ secrets.LANGFLOW_GITHUB_TOKEN2 }}  # Use built-in GitHub token or valid app token
+          GITHUB_TOKEN: ${{ secrets.LANGFLOW_GITHUB_TOKEN }}  # Use built-in GitHub token or valid app token
           REPO: ${{ github.repository }}
           SHA: ${{ github.event.pull_request.head.sha }}
           PROPERLY_REVIEWED: ${{ steps.analysis.outputs.properlyReviewed }}
           ANALYSIS_JSON: ${{ steps.analysis.outputs.pr_analysis_json }}
         run: |
-          echo "🧪 Creating GitHub Check Run..."
+          echo "🧪 Creating simple GitHub Check Run..."
       
-          # Set status based on result
-          conclusion="failure"
-          if [ "$PROPERLY_REVIEWED" = "true" ]; then
-            conclusion="success"
-          fi
+          payload=$(jq -n \
+            --arg name "Test Check Run" \
+            --arg sha "$SHA" \
+            --arg status "completed" \
+            --arg conclusion "success" \
+            --arg title "Test Check Run Summary" \
+            --arg summary "✅ This is a simple check run to test the API." \
+            '{
+              name: $name,
+              head_sha: $sha,
+              status: $status,
+              conclusion: $conclusion,
+              output: {
+                title: $title,
+                summary: $summary
+              }
+            }')
       
-          # Format the summary using Markdown
-          markdown_summary="### 🧾 PR Analysis Result
+          echo "📦 Sending payload:"
+          echo "$payload" | jq .
       
-          | Key                | Value               |
-          |--------------------|---------------------|
-          | Properly Reviewed? | $PROPERLY_REVIEWED  |
-          | Conclusion         | $conclusion         |
-          
-          <details>
-          <summary>🔍 Analysis JSON (raw)</summary>
-      
-          \`\`\`json
-          $ANALYSIS_JSON
-          \`\`\`
-          
-          </details>
-          "
-      
-          # Safely encode summary string
-          summary_json=$(jq -n --arg title "Langflow PR Analysis" --arg summary "$markdown_summary" \
-            '{name: $title, head_sha: env.SHA, status: "completed", conclusion: env.conclusion, output: {title: $title, summary: $summary}}')
-      
-          echo "📦 Payload for check-run:"
-          echo "$summary_json" | jq .
-      
-          # Send check run via GitHub API
-          http_code=$(curl -s -o output.json -w "%{http_code}" -X POST \
+          http_code=$(curl -s -o response.json -w "%{http_code}" -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/$REPO/check-runs \
-            -d "$summary_json")
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/$REPO/check-runs" \
+            -d "$payload")
       
-          cat output.json
+          echo "🔁 Response:"
+          cat response.json
       
           if [ "$http_code" -ne 201 ]; then
-            echo "❌ Failed to create check run. HTTP $http_code"
+            echo "❌ Failed to create check run (HTTP $http_code)"
             exit 1
           fi
-
+      
           echo "✅ Check run created successfully!"
 
   merge-pr:
