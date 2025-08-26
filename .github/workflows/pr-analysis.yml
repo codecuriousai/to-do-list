@@ -137,8 +137,8 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const analysisRaw = `${{ needs.analyze-pr.outputs.analysis }}`;
-            const properlyReviewed = `${{ needs.analyze-pr.outputs.properlyReviewed }}` === 'true';
+            const analysisRaw = `${{ steps.analysis.outputs.pr_analysis_json }}`;
+            const properlyReviewed = `${{ steps.analysis.outputs.properlyReviewed }}` === 'true';
 
             let assessmentText = 'Unknown';
             try {
