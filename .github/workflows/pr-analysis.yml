@@ -142,8 +142,9 @@ jobs:
         run: |
           echo "✅ PR was properly reviewed. Proceeding with merge (simulate Langflow Agent)."
           echo "Analysis output:"
-          const analysis = JSON.parse(needs.analyze-pr.outputs.analysis);
-          core.info(`Raw assessment: ${analysis?.comparison_analysis?.review_assessment}`);
+          const analysisJson = '${{ needs.analyze-pr.outputs.analysis }}';
+          const analysis = JSON.parse(analysisJson);
+          # core.info(`Raw assessment: ${analysis?.comparison_analysis?.review_assessment}`);
 
   comment-pr:
     needs: analyze-pr
