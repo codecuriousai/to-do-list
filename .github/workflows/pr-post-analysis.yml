@@ -1,0 +1,412 @@
+name: PR POST Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  analyze-pr:
+    runs-on: ubuntu-latest
+    outputs:
+      analysis: ${{ steps.analysis.outputs.pr_analysis_json }}
+      properlyReviewed: ${{ steps.analysis.outputs.properlyReviewed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Call Langflow API
+        id: langflow_call
+        env:
+          API_KEY: "AstraCS:doJijFJwFioApBaswsaRBigy:5863ee7b2f203becbd015d24db02193c98d6aaccd317b4c247c70b12ffa88bc4"
+          API_ENDPOINT: "https://api.langflow.astra.datastax.com/lf/720b3827-93a5-40a1-9c93-0a974680f48c/api/v1/run"
+          FLOW_ID: "43913ec5-a0de-44b8-b31b-44019176489d"
+          GITHUB_TOKEN: ${{ secrets.LANGFLOW_API_KEY }}
+        run: |
+          repo_url="https://github.com/${{ github.repository }}"
+          branch_name="PR-Comments-Post"
+          github_token="${GITHUB_TOKEN}"
+          per_page=10
+          max_pages=5
+          pr_number=${{ github.event.pull_request.number }}
+          session_id="user_$(date +%s)"
+
+          payload=$(printf '{
+            "tweaks": {
+              "GitHubBranchPRsFetcher-Cdz4k": {
+                "repo_url": "%s",
+                "branch_name": "%s",
+                "github_token": "%s",
+                "per_page": %d,
+                "max_pages": %d,
+                "pr_number": %d
+              }
+            },
+            "session_id": "%s",
+            "body": "Hi"
+          }' \
+          "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id")
+
+          response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $API_KEY" \
+            -d "$payload")
+
+          echo "response_json=$response" >> $GITHUB_OUTPUT
+
+      - name: Process Langflow PR Analysis JSON
+        id: analysis
+        uses: actions/github-script@v6
+        env:
+          LANGFLOW_RESPONSE_JSON: ${{ steps.langflow_call.outputs.response_json }}
+        with:
+          script: |
+            function extractAndParseJSON(text) {
+              const strategies = [
+                (t) =>
+                  t
+                    .replace(/```json\s*/gi, '')
+                    .replace(/```\s*/gi, '')
+                    .trim(),
+
+                (t) => {
+                  const start = Math.min(
+                    t.indexOf('{') === -1 ? Infinity : t.indexOf('{'),
+                    t.indexOf('[') === -1 ? Infinity : t.indexOf('[')
+                  );
+                  const end = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
+                  return start !== Infinity && end !== -1
+                    ? t.substring(start, end + 1)
+                    : t;
+                },
+
+                (t) => {
+                  const arrayMatch = t.match(/\[[\s\S]*\]/);
+                  return arrayMatch ? arrayMatch[0] : t;
+                },
+
+                (t) => {
+                  const objectMatch = t.match(/\{[\s\S]*\}/);
+                  return objectMatch ? objectMatch[0] : t;
+                }
+              ];
+
+              for (const strategy of strategies) {
+                try {
+                  const cleaned = strategy(text);
+                  return JSON.parse(cleaned);
+                } catch {
+                  continue;
+                }
+              }
+
+              throw new Error('Unable to extract valid JSON from response');
+            }
+
+            const raw = process.env.LANGFLOW_RESPONSE_JSON;
+            core.info(`Raw Langflow response: ${raw}`);
+
+            let responseObj;
+            try {
+              responseObj = JSON.parse(raw);
+            } catch (err) {
+              core.setFailed(`Failed to parse Langflow response JSON: ${err.message}`);
+              return;
+            }
+
+            const msgText = responseObj?.outputs?.[0]?.outputs?.[1]?.results?.message?.text;
+            if (!msgText) {
+              core.setFailed('No message text found in Langflow response outputs.');
+              return;
+            }
+
+            let analysis;
+            try {
+              analysis = extractAndParseJSON(msgText);
+              const assessment = (analysis[0]?.comparison_analysis?.review_assessment || '').toLowerCase();
+              const properlyReviewed = assessment === 'properly_reviewed';
+
+              core.info(`Raw assessment: ${analysis[0]?.comparison_analysis?.review_assessment}`);
+              core.info(`Raw properlyReviewed: ${properlyReviewed}`);
+
+              core.setOutput("pr_analysis_json", JSON.stringify(analysis));
+              core.setOutput("properlyReviewed", properlyReviewed.toString());
+            } catch (err) {
+              core.setFailed(`Failed to extract or parse JSON from message text: ${err.message}`);
+            }
+            
+      - name: Post commit status (as alternative to check-run)
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const analysisRaw = `${{ steps.analysis.outputs.pr_analysis_json }}`;
+            const properlyReviewed = `${{ steps.analysis.outputs.properlyReviewed }}` === 'true';
+
+            let assessmentText = 'Unknown';
+            try {
+              const analysis = JSON.parse(analysisRaw);
+              assessmentText = analysis?.[0]?.comparison_analysis?.review_assessment || 'Not found';
+            } catch (e) {
+              core.warning("Failed to parse analysis JSON: " + e.message);
+            }
+            const conclusion = 'success'; // or 'failure', etc.
+            const sha = context.payload.pull_request.head.sha;
+            const repo = context.repo;
+      
+            await github.rest.repos.createCommitStatus({
+              owner: repo.owner,
+              repo: repo.repo,
+              sha: sha,
+              state: conclusion,
+              context: 'PR Analysis',
+              description: `PR analysis completed: ${assessmentText}` ,
+              target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            });
+            
+  merge-pr:
+    needs: analyze-pr
+    runs-on: ubuntu-latest
+    if: needs.analyze-pr.outputs.properlyReviewed == 'true'
+    steps:
+      - name: Call Langflow API
+        id: merge_langflow_call
+        env:
+          API_KEY: "AstraCS:doJijFJwFioApBaswsaRBigy:5863ee7b2f203becbd015d24db02193c98d6aaccd317b4c247c70b12ffa88bc4"
+          API_ENDPOINT: "https://api.langflow.astra.datastax.com/lf/720b3827-93a5-40a1-9c93-0a974680f48c/api/v1/run"
+          FLOW_ID: "e8897967-a224-471b-aa29-2ded1eb8d361"
+          GITHUB_TOKEN: ${{ secrets.LANGFLOW_API_KEY }}
+        run: |
+          repo_url="https://github.com/${{ github.repository }}"
+          branch_name="PR-Comments-Post"
+          github_token="${GITHUB_TOKEN}"
+          per_page=10
+          max_pages=5
+          pr_number=${{ github.event.pull_request.number }}
+          session_id="user_$(date +%s)"
+
+          payload=$(printf '{
+            "tweaks": {
+              "GitHubOpenPRsFetcher-VgGay": {
+                "repo_url": "%s",
+                "branch_name": "%s",
+                "github_token": "%s",
+                "per_page": %d,
+                "max_pages": %d,
+                "pr_number": %d
+              }
+            },
+            "session_id": "%s",
+            "body": "Hi"
+          }' \
+          "$repo_url" "$branch_name" "$github_token" "$per_page" "$max_pages" "$pr_number" "$session_id")
+
+          response=$(curl -s -X POST "$API_ENDPOINT/$FLOW_ID" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $API_KEY" \
+            -d "$payload")
+
+          echo "response_json=$response" >> $GITHUB_OUTPUT
+
+      - name: Process Langflow PR Analysis JSON
+        id: merge
+        uses: actions/github-script@v6
+        env:
+          MERGE_LANGFLOW_RESPONSE_JSON: ${{ steps.merge_langflow_call.outputs.response_json }}
+        with:
+          script: |
+            function extractAndParseJSON(text) {
+              const strategies = [
+                (t) =>
+                  t
+                    .replace(/```json\s*/gi, '')
+                    .replace(/```\s*/gi, '')
+                    .trim(),
+
+                (t) => {
+                  const start = Math.min(
+                    t.indexOf('{') === -1 ? Infinity : t.indexOf('{'),
+                    t.indexOf('[') === -1 ? Infinity : t.indexOf('[')
+                  );
+                  const end = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
+                  return start !== Infinity && end !== -1
+                    ? t.substring(start, end + 1)
+                    : t;
+                },
+
+                (t) => {
+                  const arrayMatch = t.match(/\[[\s\S]*\]/);
+                  return arrayMatch ? arrayMatch[0] : t;
+                },
+
+                (t) => {
+                  const objectMatch = t.match(/\{[\s\S]*\}/);
+                  return objectMatch ? objectMatch[0] : t;
+                }
+              ];
+
+              for (const strategy of strategies) {
+                try {
+                  const cleaned = strategy(text);
+                  return JSON.parse(cleaned);
+                } catch {
+                  continue;
+                }
+              }
+
+              throw new Error('Unable to extract valid JSON from response');
+            }
+
+            const raw = process.env.MERGE_LANGFLOW_RESPONSE_JSON;
+            core.info(`Raw Langflow response: ${raw}`);
+
+            let responseObj;
+            try {
+              responseObj = JSON.parse(raw);
+            } catch (err) {
+              core.setFailed(`Failed to parse Langflow response JSON: ${err.message}`);
+              return;
+            }
+
+            const msgText = responseObj?.outputs?.[0]?.outputs?.[0]?.results?.message?.text;
+            if (!msgText) {
+              core.setFailed('No message text found in Langflow response outputs.');
+              return;
+            }
+
+            let mergeAnalysis;
+            try {
+              mergeAnalysis = extractAndParseJSON(msgText);
+              core.info(`Raw mergeAnalysis: ${JSON.stringify(mergeAnalysis, null, 2)}`);
+
+              core.info(`Raw assessment: ${mergeAnalysis}`);
+
+              core.setOutput("pr_analysis_json", JSON.stringify(mergeAnalysis, null, 2));
+            } catch (err) {
+              core.setFailed(`Failed to extract or parse JSON from message text: ${err.message}`);
+            }
+            
+      - name: Check Merge status
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const mergeAnalysisRaw = ${{ steps.merge.outputs.pr_analysis_json }};
+            
+            let assessmentText = 'Unknown';
+            try {
+              const mergeAnalysis = mergeAnalysisRaw;
+              assessmentText = mergeAnalysis.pull_requests[0].merge_readiness.status || 'Not found';
+            } catch (e) {
+              core.warning("Failed to parse analysis JSON: " + e.message);
+            }
+            const conclusion = 'success'; // or 'failure', etc.
+            const sha = context.payload.pull_request.head.sha;
+            const repo = context.repo;
+      
+            await github.rest.repos.createCommitStatus({
+              owner: repo.owner,
+              repo: repo.repo,
+              sha: sha,
+              state: conclusion,
+              context: 'Merge Status',
+              description: `Merge Status completed: ${assessmentText}` ,
+              target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            });
+            
+  comment-pr:
+    needs: analyze-pr
+    runs-on: ubuntu-latest
+    if: needs.analyze-pr.outputs.properlyReviewed == 'false'
+    steps:
+      - name: Post Inline Review Comments to PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const analysisRaw = `${{ needs.analyze-pr.outputs.analysis }}`;
+            let result;
+
+            try {
+              result = JSON.parse(analysisRaw);
+            } catch (e) {
+              core.setFailed("❌ Failed to parse analysis JSON: " + e.message);
+              return;
+            }
+
+            const repository = context.repo;
+            const prNumber = ${{github.event.pull_request.number}};
+            const comments = result[0]?.comparison_analysis?.gaps_identified;
+
+            if (!Array.isArray(comments) || comments.length === 0) {
+              core.warning("⚠️ No review comments to post.");
+              return;
+            }
+
+            const latestCommitSha = context.payload.pull_request.head.sha;
+            const results = [];
+
+            for (const [index, item] of comments.entries()) {
+              const path = item?.file || item?.path;
+              const line = item?.line;
+              const body = `**AI Code Review:** ${item?.description || item?.comment || ''}`;
+
+              if (!path || typeof line !== 'number' || !body) {
+                core.warning(`❌ Skipping invalid comment at index ${index}`);
+                results.push({ index, success: false, error: "Invalid comment data" });
+                continue;
+              }
+
+              try {
+                const response = await github.rest.pulls.createReviewComment({
+                  owner: repository.owner,
+                  repo: repository.repo,
+                  pull_number: prNumber,
+                  body,
+                  commit_id: latestCommitSha,
+                  path,
+                  line,
+                  side: "RIGHT" // Assuming commenting on new lines
+                });
+
+                core.info(`✅ Comment posted on ${path}:${line}`);
+                results.push({ index, success: true, comment_url: response.data?.html_url });
+              } catch (err) {
+                core.warning(`❌ Failed to post comment at ${path}:${line} - ${err.message}`);
+                results.push({
+                  index,
+                  success: false,
+                  error: err.message,
+                  details: err.response?.data
+                });
+              }
+            }
+
+            const successCount = results.filter(r => r.success).length;
+            const failureCount = results.length - successCount;
+
+            core.info(`📝 Review Comment Summary: ${successCount} succeeded, ${failureCount} failed`);
+      
+      - name: Post Comments status
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const analysisRaw = `${{ steps.analysis.outputs.pr_analysis_json }}`;
+            const properlyReviewed = `${{ steps.analysis.outputs.properlyReviewed }}` === 'true';
+
+            let assessmentText = 'Unknown';
+            try {
+              const analysis = JSON.parse(analysisRaw);
+              assessmentText = analysis?.[0]?.comparison_analysis?.review_assessment || 'Not found';
+            } catch (e) {
+              core.warning("Failed to parse analysis JSON: " + e.message);
+            }
+            const conclusion = 'success'; // or 'failure', etc.
+            const sha = context.payload.pull_request.head.sha;
+            const repo = context.repo;
+      
+            await github.rest.repos.createCommitStatus({
+              owner: repo.owner,
+              repo: repo.repo,
+              sha: sha,
+              state: conclusion,
+              context: 'Post Comments Status',
+              description: `Post Comments Status completed: ADDED_COMMENTS ` ,
+              target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+            });    
