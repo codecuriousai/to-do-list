@@ -316,12 +316,72 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.analyze-pr.outputs.properlyReviewed == 'false'
     steps:
-      - name: Post comment
-        run: |
-          echo "⚠️ PR needs more review. Posting comment instead of merging."
-          # let analysisJson = ${{ needs.analyze-pr.outputs.analysis }};
-          # let analysis = JSON.parse(analysisJson);
-          # echo "$analysis"
+      - name: Post Inline Review Comments to PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const analysisRaw = `${{ needs.analyze-pr.outputs.analysis }}`;
+            let result;
+
+            try {
+              result = JSON.parse(analysisRaw);
+            } catch (e) {
+              core.setFailed("❌ Failed to parse analysis JSON: " + e.message);
+              return;
+            }
+
+            const repository = context.repo;
+            const prNumber = ${{github.event.pull_request.number}};
+            const comments = result?.comparison_analysis?.gaps_identified;
+
+            if (!Array.isArray(comments) || comments.length === 0) {
+              core.warning("⚠️ No review comments to post.");
+              return;
+            }
+
+            const latestCommitSha = context.payload.pull_request.head.sha;
+            const results = [];
+
+            for (const [index, item] of comments.entries()) {
+              const path = item?.file || item?.path;
+              const line = item?.line;
+              const body = `**AI Code Review:** ${item?.description || item?.comment || ''}`;
+
+              if (!path || typeof line !== 'number' || !body) {
+                core.warning(`❌ Skipping invalid comment at index ${index}`);
+                results.push({ index, success: false, error: "Invalid comment data" });
+                continue;
+              }
+
+              try {
+                const response = await github.rest.pulls.createReviewComment({
+                  owner: repository.owner,
+                  repo: repository.repo,
+                  pull_number: prNumber,
+                  body,
+                  commit_id: latestCommitSha,
+                  path,
+                  line,
+                  side: "RIGHT" // Assuming commenting on new lines
+                });
+
+                core.info(`✅ Comment posted on ${path}:${line}`);
+                results.push({ index, success: true, comment_url: response.data?.html_url });
+              } catch (err) {
+                core.warning(`❌ Failed to post comment at ${path}:${line} - ${err.message}`);
+                results.push({
+                  index,
+                  success: false,
+                  error: err.message,
+                  details: err.response?.data
+                });
+              }
+            }
+
+            const successCount = results.filter(r => r.success).length;
+            const failureCount = results.length - successCount;
+
+            core.info(`📝 Review Comment Summary: ${successCount} succeeded, ${failureCount} failed`);
       
       - name: Post Comments status
         uses: actions/github-script@v6
