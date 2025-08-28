@@ -1,5 +1,5 @@
 // Critical issue: Hardcoded credentials
-const dbPassword = "admin123"; // sonar: S2068 - Hardcoded credentials
+const dbPassword = "admin123";
 
 // Critical issue: Unvalidated user input in eval
 const userInput = "2 + 2";
