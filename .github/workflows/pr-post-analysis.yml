@@ -332,7 +332,7 @@ jobs:
 
             const repository = context.repo;
             const prNumber = ${{github.event.pull_request.number}};
-            const comments = result?.comparison_analysis?.gaps_identified;
+            const comments = result[0]?.comparison_analysis?.gaps_identified;
 
             if (!Array.isArray(comments) || comments.length === 0) {
               core.warning("⚠️ No review comments to post.");
