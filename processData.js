@@ -1,7 +1,7 @@
 // Critical issue: Hardcoded credentials
 const dbPassword = "admin123";
 
-// Critical issue: Unvalidated user input in eval
+// Critical issue: Unvalidated user input eval
 const userInput = "2 + 2";
 const result = eval(userInput); // sonar: S1523 - Use of eval is a security risk
 console.log("Eval result:", result);
