@@ -39,9 +39,6 @@ jobs:
                 "per_page": %d,
                 "max_pages": %d,
                 "pr_number": %d
-              },
-              "Agent-PqbtK":{
-                 "modelName": 'gemini-2.5-flash'
               }
             },
             "session_id": "%s",
