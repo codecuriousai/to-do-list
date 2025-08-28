@@ -1,4 +1,4 @@
-name: PR Analysis
+name: PR POST Analysis
 
 on:
   pull_request:
