@@ -17,6 +17,10 @@ formEl.addEventListener("submit", (event) => {
   toDoList();
 });
 
+/**
+ * Adds a task to the to-do list.
+ * @param {Object} task - The task object.
+ */
 function toDoList(task) {
   let newTask = inputEl.value;
   if (task) {
@@ -27,7 +31,7 @@ function toDoList(task) {
   if (task && task.checked) {
     liEl.classList.add("checked");
   }
-  liEl.innerText = newTask;
+    liEl.innerText = newTask;
   ulEl.appendChild(liEl);
   inputEl.value = "";
   const checkBtnEl = document.createElement("div");
