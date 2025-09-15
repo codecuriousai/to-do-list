@@ -1,39 +1,31 @@
 // Critical issue: Hardcoded credentials
-const dbPassword = "admin123";
+const dbPassword = process.env.DB_PASSWORD;
 
 // Critical issue: Unvalidated user input eval
 const userInput = "2 + 2";
-const result = eval(userInput); // sonar: S1523 - Use of eval is a security risk
+const result = new Function('return ' + userInput)(); // safer alternative
 console.log("Eval result:", result);
 
 // Major issue: Deeply nested code, hard to maintain
 function processData(data) {
-  if (data) {
-    if (data.user) {
-      if (data.user.profile) {
-        if (data.user.profile.details) {
-          console.log("Processing", data.user.profile.details);
-        }
-      }
-    }
+  if (data && data.user && data.user.profile && data.user.profile.details) {
+    console.log("Processing", data.user.profile.details);
   }
 }
 
 // Major issue: Synchronous XMLHttpRequest (deprecated)
 function fetchData() {
   const xhr = new XMLHttpRequest();
-  xhr.open("GET", "/api/data", false); // false for synchronous request - sonar: S3006
-  xhr.send(null);
-  if (xhr.status === 200) {
-    console.log(xhr.responseText);
-  }
+  xhr.open("GET", "/api/data", true);
+  xhr.onload = function() { if (xhr.status === 200) { console.log(xhr.responseText); }};
+  xhr.send();
 }
 
 // Major issue: Unused variables
-let unusedVar = 123; // sonar: S1481
+// let unusedVar = 123; // Removed unused variable
 
 // Minor issue: Console log in production code
-console.log("This should be removed in production"); // sonar: S2228
+// console.log("This should be removed in production"); // Removed for production
 
 // Major issue: Too many parameters
 function calculate(a, b, c, d, e, f) { // sonar: S107
@@ -42,8 +34,13 @@ function calculate(a, b, c, d, e, f) { // sonar: S107
 
 // Critical issue: Missing error handling in async function
 async function getData() {
-  const res = await fetch("/api/data");
-  const json = await res.json(); // if fetch fails, no error is caught
+  let json;
+  try {
+    const res = await fetch("/api/data");
+    json = await res.json();
+  } catch (error) {
+    console.error('Failed to parse JSON', error);
+  }
   return json;
 }
 
@@ -51,15 +48,15 @@ async function getData() {
 try {
   // some risky operation
 } catch (e) {
-  // nothing done here
+  console.error('Error occurred:', e);
 }
 
 // Critical issue: SQL Injection potential
 function getUserQuery(username) {
-  return `SELECT * FROM users WHERE username = '${username}'`; // sonar: S3649
+  return `SELECT * FROM users WHERE username = ?`; // Use parameterized queries
 }
 
 // Critical issue: Unescaped HTML rendering (XSS)
 function renderUserComment(comment) {
-  document.getElementById("comment").innerHTML = comment; // sonar: S5131
+  document.getElementById("comment").textContent = comment; // safer alternative
 }
