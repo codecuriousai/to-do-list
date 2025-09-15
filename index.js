@@ -50,7 +50,7 @@ function toDoList(task) {
     liEl.remove();
     updateLocalStorage();
   });
-  // Update localStorage after all tasks are modified.
+  // Call updateLocalStorage() only once after all tasks are modified.
 }
 
 function updateLocalStorage() {
