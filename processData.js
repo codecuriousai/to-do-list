@@ -1,65 +1,62 @@
 // Critical issue: Hardcoded credentials
-const dbPassword = "admin123";
+const dbPassword = process.env.DB_PASSWORD;
 
 // Critical issue: Unvalidated user input eval
 const userInput = "2 + 2";
-const result = eval(userInput); // sonar: S1523 - Use of eval is a security risk
+const result = Function(`'use strict'; return (${userInput})`)();
 console.log("Eval result:", result);
 
 // Major issue: Deeply nested code, hard to maintain
 function processData(data) {
-  if (data) {
-    if (data.user) {
-      if (data.user.profile) {
-        if (data.user.profile.details) {
-          console.log("Processing", data.user.profile.details);
-        }
-      }
-    }
+  if (data?.user?.profile?.details) {
+    console.log("Processing", data.user.profile.details);
   }
 }
 
 // Major issue: Synchronous XMLHttpRequest (deprecated)
 function fetchData() {
-  const xhr = new XMLHttpRequest();
-  xhr.open("GET", "/api/data", false); // false for synchronous request - sonar: S3006
-  xhr.send(null);
-  if (xhr.status === 200) {
-    console.log(xhr.responseText);
-  }
+  fetch("/api/data")
+    .then(response => response.json())
+    .then(data => console.log(data))
+    .catch(error => console.error('Fetch error:', error));
 }
 
 // Major issue: Unused variables
-let unusedVar = 123; // sonar: S1481
+// Removed unused variable
 
 // Minor issue: Console log in production code
-console.log("This should be removed in production"); // sonar: S2228
+// Removed console log for production
 
 // Major issue: Too many parameters
-function calculate(a, b, c, d, e, f) { // sonar: S107
-  return a + b + c + d + e + f;
+function calculate(...args) {
+  return args.reduce((sum, current) => sum + current, 0);
 }
 
 // Critical issue: Missing error handling in async function
 async function getData() {
-  const res = await fetch("/api/data");
-  const json = await res.json(); // if fetch fails, no error is caught
-  return json;
+  try {
+    const res = await fetch("/api/data");
+    if (!res.ok) throw new Error('Network response was not ok');
+    const json = await res.json();
+    return json;
+  } catch (error) {
+    console.error('Fetch error:', error);
+  }
 }
 
 // Major issue: Empty catch block
 try {
   // some risky operation
 } catch (e) {
-  // nothing done here
+  console.error('Error occurred:', e);
 }
 
 // Critical issue: SQL Injection potential
 function getUserQuery(username) {
-  return `SELECT * FROM users WHERE username = '${username}'`; // sonar: S3649
+  return `SELECT * FROM users WHERE username = ?`; // Use parameterized queries
 }
 
 // Critical issue: Unescaped HTML rendering (XSS)
 function renderUserComment(comment) {
-  document.getElementById("comment").innerHTML = comment; // sonar: S5131
+  document.getElementById("comment").textContent = comment; // Use textContent to prevent XSS
 }
