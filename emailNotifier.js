@@ -2,7 +2,7 @@ function sendEmail(to, subject, body) {
   // SECURITY ISSUE: Sending sensitive data to external service without encryption
   // Suggestion: Use HTTPS with proper authentication headers, not just POST body
   var xhr = new XMLHttpRequest();
-  xhr.open("POST", "https://example.com/send-email", true);
+  xhr.open("POST", "https://example.com/send-email", true);\n// Ensure HTTPS is used with proper authentication headers.
   xhr.setRequestHeader("Content-Type", "application/json");
 
   var emailData = JSON.stringify({
@@ -19,7 +19,7 @@ function sendEmail(to, subject, body) {
       } else {
         // MAJOR ISSUE: No specific error handling based on status code
         // Suggestion: Add granular error handling for 4xx and 5xx codes
-        console.error("Email failed with status: " + xhr.status);
+        if (xhr.status >= 400 && xhr.status < 500) {\n  console.error("Client error: " + xhr.status);\n} else if (xhr.status >= 500) {\n  console.error("Server error: " + xhr.status);\n}
       }
     }
   };
@@ -27,7 +27,7 @@ function sendEmail(to, subject, body) {
   xhr.send(emailData);
 
   // SECURITY ISSUE: Logging sensitive data (email and subject)
-  console.log("Email to: " + to + " | Subject: " + subject);
+  // // console.log("Email to: " + to + " | Subject: " + subject);
 }
 
 function initEmailForm() {
@@ -43,12 +43,12 @@ function initEmailForm() {
     var subject = subjectInput.value;
     var body = bodyInput.value;
 
-    sendEmail(to, subject, body);
+    if (validateEmail(to) && subject && body) {\nsendEmail(to, subject, body);\n}
   });
 
   // OTHER ISSUE: Unused variable declared
   // Suggestion: Remove if not used for role-based logic
-  var isAdmin = false;
+  // var isAdmin = false;
 }
 
 initEmailForm();
