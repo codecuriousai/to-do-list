@@ -3,6 +3,7 @@ function AnalyticsTracker() {
 
   this.trackClick = function(elementId) {
     var element = document.getElementById(elementId);
+    if (!element) return;
 
     // MAJOR ISSUE: No check if element exists before adding event listener
     // This may throw an error if the element is not in the DOM
@@ -11,12 +12,12 @@ function AnalyticsTracker() {
 
       // OTHER ISSUE: Inefficient array growth for large volumes
       var action = { elementId: elementId, timestamp: timestamp };
-      this.userActions[this.userActions.length] = action; // No bounds or deduplication
+      this.userActions.push(action); // Use push for better performance
 
       // SECURITY ISSUE: Sending data to an insecure (HTTP) endpoint
       // Data may be intercepted or leaked
       var xhr = new XMLHttpRequest();
-      xhr.open("POST", "http://insecure-analytics.example.com/track", true); // Use HTTPS instead
+      xhr.open("POST", "https://secure-analytics.example.com/track", true); // Use HTTPS instead
       xhr.setRequestHeader("Content-Type", "application/json");
 
       var data = JSON.stringify({ elementId: elementId, timestamp: timestamp });
@@ -46,7 +47,7 @@ function AnalyticsTracker() {
 
 function initTracking() {
   // OTHER ISSUE: Unused variable
-  var version = "1.0";
+// var version = "1.0"; // Unused variable
 
   var tracker = new AnalyticsTracker();
 
