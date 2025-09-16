@@ -3,6 +3,8 @@ function sendEmail(to, subject, body) {
   // Suggestion: Use HTTPS with proper authentication headers, not just POST body
   var xhr = new XMLHttpRequest();
   xhr.open("POST", "https://example.com/send-email", true);
+  xhr.setRequestHeader("Authorization", "Bearer YOUR_TOKEN");
+  xhr.setRequestHeader("Authorization", "Bearer YOUR_TOKEN");
   xhr.setRequestHeader("Content-Type", "application/json");
 
   var emailData = JSON.stringify({
@@ -19,7 +21,11 @@ function sendEmail(to, subject, body) {
       } else {
         // MAJOR ISSUE: No specific error handling based on status code
         // Suggestion: Add granular error handling for 4xx and 5xx codes
-        console.error("Email failed with status: " + xhr.status);
+        if (xhr.status >= 400 && xhr.status < 500) {
+          console.error("Client error: " + xhr.status);
+        } else if (xhr.status >= 500) {
+          console.error("Server error: " + xhr.status);
+        }
       }
     }
   };
@@ -43,12 +49,20 @@ function initEmailForm() {
     var subject = subjectInput.value;
     var body = bodyInput.value;
 
+    if (!validateEmail(to) || !subject || !body) {
+      alert('Please provide valid email, subject, and body.');
+      return;
+    }
+    if (!validateEmail(to) || !subject || !body) {
+      alert('Please provide valid email, subject, and body.');
+      return;
+    }
     sendEmail(to, subject, body);
   });
 
   // OTHER ISSUE: Unused variable declared
   // Suggestion: Remove if not used for role-based logic
-  var isAdmin = false;
+// var isAdmin = false;
 }
 
 initEmailForm();
