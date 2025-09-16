@@ -3,7 +3,7 @@ function AnalyticsTracker() {
 
   this.trackClick = function(elementId) {
     var element = document.getElementById(elementId);
-    if (!element) return;
+    if (!element) return; // Element does not exist
 
     // MAJOR ISSUE: No check if element exists before adding event listener
     // This may throw an error if the element is not in the DOM
@@ -12,7 +12,7 @@ function AnalyticsTracker() {
 
       // OTHER ISSUE: Inefficient array growth for large volumes
       var action = { elementId: elementId, timestamp: timestamp };
-      this.userActions.push(action); // Use push for better performance
+      this.userActions[this.userActions.length] = action; // Direct assignment for better performance
 
       // SECURITY ISSUE: Sending data to an insecure (HTTP) endpoint
       // Data may be intercepted or leaked
