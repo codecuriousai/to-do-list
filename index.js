@@ -27,7 +27,7 @@ function toDoList(task) {
   if (task && task.checked) {
     liEl.classList.add("checked");
   }
-  liEl.innerText = newTask;
+  liEl.innerText = sanitize(newTask);
   ulEl.appendChild(liEl);
   inputEl.value = "";
   const checkBtnEl = document.createElement("div");
@@ -43,14 +43,14 @@ function toDoList(task) {
 
   checkBtnEl.addEventListener("click", () => {
     liEl.classList.toggle("checked");
-    updateLocalStorage();
+    if (task) { updateLocalStorage(); }
   });
 
   trashBtnEl.addEventListener("click", () => {
     liEl.remove();
-    updateLocalStorage();
+    if (task) { updateLocalStorage(); }
   });
-  updateLocalStorage();
+  if (task) { updateLocalStorage(); }
 }
 
 function updateLocalStorage() {
