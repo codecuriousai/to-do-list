@@ -4,7 +4,7 @@ const inputEl = document.querySelector(".input");
 
 const ulEl = document.querySelector(".list");
 
-let list = JSON.parse(localStorage.getItem("list"));
+const list = JSON.parse(localStorage.getItem("list"));
 if (list) {
   list.forEach((task) => {
     toDoList(task);
@@ -27,17 +27,17 @@ function toDoList(task) {
   if (task && task.checked) {
     liEl.classList.add("checked");
   }
-  liEl.innerText = newTask;
+  liEl.textContent = newTask;
   ulEl.appendChild(liEl);
   inputEl.value = "";
   const checkBtnEl = document.createElement("div");
   checkBtnEl.innerHTML = `
-  <i class="fas fa-check-square">
+  <i class=\"fas fa-check-square\">
   `;
   liEl.appendChild(checkBtnEl);
   const trashBtnEl = document.createElement("div");
   trashBtnEl.innerHTML = `
-  <i class="fas fa-trash"></i>
+  <i class=\"fas fa-trash\"></i>
   `;
   liEl.appendChild(trashBtnEl);
 
@@ -50,15 +50,15 @@ function toDoList(task) {
     liEl.remove();
     updateLocalStorage();
   });
-  updateLocalStorage();
+  // Call updateLocalStorage only once after all changes.
 }
 
 function updateLocalStorage() {
   const liEls = document.querySelectorAll("li");
-  list = [];
+  const list = [];
   liEls.forEach((liEl) => {
     list.push({
-      name: liEl.innerText,
+      name: liEl.textContent,
       checked: liEl.classList.contains("checked"),
     });
   });
