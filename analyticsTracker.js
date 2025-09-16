@@ -11,12 +11,12 @@ function AnalyticsTracker() {
 
       // OTHER ISSUE: Inefficient array growth for large volumes
       var action = { elementId: elementId, timestamp: timestamp };
-      this.userActions[this.userActions.length] = action; // No bounds or deduplication
+      this.userActions.push(action); // More efficient array handling
 
       // SECURITY ISSUE: Sending data to an insecure (HTTP) endpoint
       // Data may be intercepted or leaked
       var xhr = new XMLHttpRequest();
-      xhr.open("POST", "http://insecure-analytics.example.com/track", true); // Use HTTPS instead
+      xhr.open("POST", "https://insecure-analytics.example.com/track", true); // Use HTTPS instead
       xhr.setRequestHeader("Content-Type", "application/json");
 
       var data = JSON.stringify({ elementId: elementId, timestamp: timestamp });
@@ -46,7 +46,7 @@ function AnalyticsTracker() {
 
 function initTracking() {
   // OTHER ISSUE: Unused variable
-  var version = "1.0";
+  // var version = "1.0";
 
   var tracker = new AnalyticsTracker();
 
