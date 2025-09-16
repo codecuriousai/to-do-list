@@ -3,6 +3,7 @@ function AnalyticsTracker() {
 
   this.trackClick = function(elementId) {
     var element = document.getElementById(elementId);
+    if (!element) return;
 
     // MAJOR ISSUE: No check if element exists before adding event listener
     // This may throw an error if the element is not in the DOM
@@ -11,12 +12,12 @@ function AnalyticsTracker() {
 
       // OTHER ISSUE: Inefficient array growth for large volumes
       var action = { elementId: elementId, timestamp: timestamp };
-      this.userActions[this.userActions.length] = action; // No bounds or deduplication
+      this.userActions.push(action);
 
       // SECURITY ISSUE: Sending data to an insecure (HTTP) endpoint
       // Data may be intercepted or leaked
       var xhr = new XMLHttpRequest();
-      xhr.open("POST", "http://insecure-analytics.example.com/track", true); // Use HTTPS instead
+      xhr.open("POST", "https://insecure-analytics.example.com/track", true); // Use HTTPS instead
       xhr.setRequestHeader("Content-Type", "application/json");
 
       var data = JSON.stringify({ elementId: elementId, timestamp: timestamp });
@@ -29,7 +30,7 @@ function AnalyticsTracker() {
     var report = [];
 
     // OTHER ISSUE: Manual deep copy via loop can be slow on large data
-    for (var i = 0; i < this.userActions.length; i++) {
+    var report = this.userActions.map(action => ({ elementId: action.elementId, timestamp: action.timestamp }));
       var action = this.userActions[i];
       report[i] = {
         elementId: action.elementId,
@@ -46,7 +47,7 @@ function AnalyticsTracker() {
 
 function initTracking() {
   // OTHER ISSUE: Unused variable
-  var version = "1.0";
+// var version = "1.0";
 
   var tracker = new AnalyticsTracker();
 
