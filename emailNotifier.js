@@ -19,7 +19,11 @@ function sendEmail(to, subject, body) {
       } else {
         // MAJOR ISSUE: No specific error handling based on status code
         // Suggestion: Add granular error handling for 4xx and 5xx codes
-        console.error("Email failed with status: " + xhr.status);
+        if (xhr.status >= 400 && xhr.status < 500) {
+          console.error("Client error: " + xhr.status);
+        } else if (xhr.status >= 500) {
+          console.error("Server error: " + xhr.status);
+        }
       }
     }
   };
@@ -27,7 +31,14 @@ function sendEmail(to, subject, body) {
   xhr.send(emailData);
 
   // SECURITY ISSUE: Logging sensitive data (email and subject)
-  console.log("Email to: " + to + " | Subject: " + subject);
+  // console.log("Email to: " + to + " | Subject: " + subject);
+  // Removed logging of sensitive information.
+}
+
+function validateEmail(email) {
+  // Simple regex for email validation
+  var re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return re.test(String(email).toLowerCase());
 }
 
 function initEmailForm() {
@@ -43,12 +54,16 @@ function initEmailForm() {
     var subject = subjectInput.value;
     var body = bodyInput.value;
 
-    sendEmail(to, subject, body);
+    if (validateEmail(to) && subject && body) {
+      sendEmail(to, subject, body);
+    } else {
+      alert('Please enter valid email and non-empty subject/body.');
+    }
   });
 
   // OTHER ISSUE: Unused variable declared
   // Suggestion: Remove if not used for role-based logic
-  var isAdmin = false;
+  // var isAdmin = false;
 }
 
 initEmailForm();
