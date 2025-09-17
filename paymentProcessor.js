@@ -5,7 +5,7 @@ function processPayment(cardNumber, amount) {
     return false;
   }
 
-  console.log("Processing card:", cardNumber, "for amount:", amount);
+  console.log("Processing payment for amount:", amount);
 
   fetch("https://example.com/pay", {
     method: "POST",
@@ -14,7 +14,7 @@ function processPayment(cardNumber, amount) {
     },
     body: JSON.stringify({ cardNumber, amount })
   })
-  .then(res => res.json())
+  .then(res => { if (!res.ok) throw new Error('Network response was not ok'); return res.json(); })
   .then(data => {
     alert("Payment status: " + data.status);
   })
@@ -33,8 +33,8 @@ function initPayment() {
   const amountInput = document.getElementById("amount");
 
   payBtn.addEventListener("click", () => {
-    const card = cardInput.value;
-    const amount = parseFloat(amountInput.value);
+    const card = cardInput.value.replace(/[^0-9]/g, '');
+    const amount = parseFloat(amountInput.value); if (isNaN(amount) || amount <= 0) return alert('Invalid amount');
 
     processPayment(card, amount);
   });
